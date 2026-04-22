@@ -3764,8 +3764,8 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
     <script>
     // Configuration Google Drive pour Librarium
     const GDRIVE_CONFIG = {
-        CLIENT_ID: '664786807368-re5l90510tflftvhcrq88jcnngp8pcdi.apps.googleusercontent.com',  // À REMPLACER
-        API_KEY: 'AIzaSyAGRKB5tOQ4cc3CLJ3xP9WNQ6N7p-R-gLE',  // À REMPLACER
+        CLIENT_ID: 'VOTRE_CLIENT_ID.apps.googleusercontent.com',  // À REMPLACER
+        API_KEY: 'VOTRE_API_KEY',  // À REMPLACER
         DISCOVERY_DOCS: ['https://www.googleapis.com/discovery/v1/apis/drive/v3/rest'],
         SCOPES: 'https://www.googleapis.com/auth/drive'
     };
@@ -4025,8 +4025,11 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
                     header: true,
                     skipEmptyLines: true,
                     complete: (results) => {
-                        window.dataOuvrages = results.data;
-                        updateTable();
+                        appState.booksData = results.data;
+                        updateFilters();
+                        renderBooksTable();
+                        populateBookForm();
+                        updateButtonStates();
                         console.log('✓ Ouvrages chargés:', results.data.length, 'lignes');
                     }
                 });
@@ -4039,8 +4042,9 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
                     header: true,
                     skipEmptyLines: true,
                     complete: (results) => {
-                        window.dataAuthors = results.data;
-                        populateFilters();
+                        appState.authorsData = results.data;
+                        updateAuthorDatalists();
+                        updateButtonStates();
                         console.log('✓ Auteurs chargés:', results.data.length, 'lignes');
                     }
                 });
@@ -4053,7 +4057,9 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
                     header: true,
                     skipEmptyLines: true,
                     complete: (results) => {
-                        window.dataLecteurs = results.data;
+                        appState.readersData = results.data;
+                        updateReaderDatalists();
+                        updateButtonStates();
                         console.log('✓ Lecteurs chargés:', results.data.length, 'lignes');
                     }
                 });
@@ -4061,7 +4067,6 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
             
             if (ouvragesContent || auteursContent || lecteursContent) {
                 console.log('✓ Données chargées depuis Drive avec succès');
-                alert('✓ Fichiers chargés depuis Drive avec succès !');
             } else {
                 alert('⚠️ Aucun fichier trouvé sur Drive');
             }
@@ -4079,7 +4084,7 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
             return;
         }
         
-        if (!window.dataOuvrages || window.dataOuvrages.length === 0) {
+        if (!appState.booksData || appState.booksData.length === 0) {
             alert('Aucune donnée à sauvegarder. Chargez d\'abord des fichiers.');
             return;
         }
@@ -4088,19 +4093,22 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
             console.log('⬆️ Sauvegarde sur Drive...');
             
             // Sauvegarder Ouvrages.csv
-            const ouvragesCSV = Papa.unparse(window.dataOuvrages, { delimiter: '\t' });
+            const ouvragesCSV = Papa.unparse(appState.booksData, { delimiter: '\t' });
             await saveToGoogleDrive('Ouvrages.csv', ouvragesCSV);
+            console.log('✓ Ouvrages.csv sauvegardé');
             
             // Sauvegarder Auteurs.csv
-            if (window.dataAuthors && window.dataAuthors.length > 0) {
-                const auteursCSV = Papa.unparse(window.dataAuthors, { delimiter: '\t' });
+            if (appState.authorsData && appState.authorsData.length > 0) {
+                const auteursCSV = Papa.unparse(appState.authorsData, { delimiter: '\t' });
                 await saveToGoogleDrive('Auteurs.csv', auteursCSV);
+                console.log('✓ Auteurs.csv sauvegardé');
             }
             
             // Sauvegarder Lecteurs.csv
-            if (window.dataLecteurs && window.dataLecteurs.length > 0) {
-                const lecteursCSV = Papa.unparse(window.dataLecteurs, { delimiter: '\t' });
+            if (appState.readersData && appState.readersData.length > 0) {
+                const lecteursCSV = Papa.unparse(appState.readersData, { delimiter: '\t' });
                 await saveToGoogleDrive('Lecteurs.csv', lecteursCSV);
+                console.log('✓ Lecteurs.csv sauvegardé');
             }
             
             console.log('✓ Tous les fichiers sauvegardés sur Drive');

@@ -1761,7 +1761,8 @@
             color: var(--primary-color);
         }
 
-        @media (max-width: 768px) {
+        /* ── Mobile = écran tactile (portrait ET paysage) ── */
+        @media (max-width: 768px), (pointer: coarse) and (hover: none) {
             .container {
                 flex-direction: column;
             }
@@ -1999,7 +2000,7 @@
         }
 
         /* Amélioration tactile pour mobile */
-        @media (max-width: 768px) {
+        @media (max-width: 768px), (pointer: coarse) and (hover: none) {
             input, select, textarea, button {
                 font-size: 16px !important; /* Évite le zoom automatique sur iOS */
             }

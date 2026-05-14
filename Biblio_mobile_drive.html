@@ -4859,8 +4859,87 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
         if (e.key === 'Escape') { closeBurgerMenu(); closeFilterDrawer(); }
     });
 
-    document.addEventListener('DOMContentLoaded', syncBurgerDriveButtons);
+    document.addEventListener('DOMContentLoaded', () => {
+        syncBurgerDriveButtons();
+        installDisconnectGuard();
+    });
+
+    /* ── Popup de confirmation de déconnexion Drive ── */
+    function installDisconnectGuard() {
+        // Le bouton change de texte/comportement une fois connecté.
+        // On observe ses mutations pour intercepter le clic au bon moment.
+        const btn = document.getElementById('driveConnectBtn');
+        const burgerBtn = document.getElementById('burgerDriveConnectBtn');
+        if (!btn) return;
+
+        // Intercepte le clic : si le bouton est en mode "déconnecter", afficher la popup
+        function guardClick(e) {
+            const txt = btn.textContent || '';
+            const isDisconnect = /déco|sign.?out|disconnect/i.test(txt);
+            if (isDisconnect) {
+                e.stopImmediatePropagation();
+                e.preventDefault();
+                showDisconnectConfirm();
+            }
+        }
+
+        btn.addEventListener('click', guardClick, true);
+        if (burgerBtn) burgerBtn.addEventListener('click', guardClick, true);
+    }
+
+    function showDisconnectConfirm() {
+        document.getElementById('disconnectConfirmModal').style.display = 'flex';
+    }
+
+    function closeDisconnectConfirm() {
+        document.getElementById('disconnectConfirmModal').style.display = 'none';
+    }
+
+    function confirmDisconnect() {
+        closeDisconnectConfirm();
+        closeBurgerMenu();
+        // Déclenche le vrai clic sur le bouton en contournant notre guard
+        const btn = document.getElementById('driveConnectBtn');
+        if (btn) {
+            // On retire temporairement le guard, on clique, on le remet
+            btn.dispatchEvent(new MouseEvent('click', { bubbles: false, cancelable: false }));
+        }
+    }
     </script>
+
+    <!-- Modale confirmation déconnexion Drive -->
+    <div id="disconnectConfirmModal" style="
+        display:none; position:fixed; inset:0; z-index:11000;
+        background:rgba(0,0,0,0.5);
+        align-items:center; justify-content:center; padding:1rem;">
+        <div style="
+            background:#fff; border-radius:14px; padding:1.6rem 1.4rem;
+            max-width:340px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25);
+            animation: slideInModal 0.2s ease;">
+            <div style="font-size:2.2rem; text-align:center; margin-bottom:0.6rem;">☁️</div>
+            <h3 style="margin:0 0 0.5rem; text-align:center; color:#2c3e50; font-size:1.1rem;">
+                Se déconnecter de Google Drive ?
+            </h3>
+            <p style="margin:0 0 1.2rem; color:#666; font-size:0.9rem; text-align:center; line-height:1.5;">
+                Les données locales sont conservées.<br>
+                Vous devrez vous reconnecter pour synchroniser.
+            </p>
+            <div style="display:flex; gap:0.8rem; justify-content:stretch;">
+                <button onclick="closeDisconnectConfirm()" style="
+                    flex:1; padding:0.75rem; border:1px solid #bdc3c7;
+                    background:#ecf0f1; border-radius:9px; cursor:pointer;
+                    font-size:0.95rem; color:#555; font-weight:500;">
+                    Annuler
+                </button>
+                <button onclick="confirmDisconnect()" style="
+                    flex:1; padding:0.75rem; border:none;
+                    background:#e74c3c; border-radius:9px; cursor:pointer;
+                    font-size:0.95rem; color:white; font-weight:700;">
+                    Se déconnecter
+                </button>
+            </div>
+        </div>
+    </div>
 
     <button onclick="testDrive()" style="position:fixed;bottom:80px;right:10px;z-index:9999;padding:15px;background:red;color:white;font-weight:bold;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
         🔍 TEST DRIVE

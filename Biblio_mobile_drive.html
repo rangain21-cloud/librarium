@@ -4907,6 +4907,93 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
     }
     </script>
 
+    <!-- ══════════════════════════════════════════════════════════════
+         Popup de confirmation de sortie (bouton Retour / Alt+Gauche)
+         ══════════════════════════════════════════════════════════════ -->
+    <div id="exitConfirmModal" style="
+        display:none; position:fixed; inset:0; z-index:12000;
+        background:rgba(0,0,0,0.55);
+        align-items:center; justify-content:center; padding:1rem;">
+        <div style="
+            background:#fff; border-radius:14px; padding:1.6rem 1.4rem;
+            max-width:340px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.28);
+            animation: slideInModal 0.2s ease;">
+            <div style="font-size:2.2rem; text-align:center; margin-bottom:0.6rem;">📚</div>
+            <h3 style="margin:0 0 0.5rem; text-align:center; color:#2c3e50; font-size:1.1rem;">
+                Quitter BiblioApp ?
+            </h3>
+            <p style="margin:0 0 1.2rem; color:#666; font-size:0.9rem; text-align:center; line-height:1.5;">
+                Toutes les données non sauvegardées<br>sur Drive seront perdues.
+            </p>
+            <div style="display:flex; gap:0.8rem; justify-content:stretch;">
+                <button onclick="cancelExit()" style="
+                    flex:1; padding:0.75rem; border:1px solid #bdc3c7;
+                    background:#ecf0f1; border-radius:9px; cursor:pointer;
+                    font-size:0.95rem; color:#555; font-weight:500;">
+                    Rester
+                </button>
+                <button onclick="confirmExit()" style="
+                    flex:1; padding:0.75rem; border:none;
+                    background:#e74c3c; border-radius:9px; cursor:pointer;
+                    font-size:0.95rem; color:white; font-weight:700;">
+                    Quitter
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /* ── Garde de sortie : bouton Retour (mobile) et Alt+Gauche (PC) ── */
+    (function () {
+        let _exitConfirmed = false;
+
+        /* Pousse un état factice dans l'historique au chargement,
+           de sorte que le "vrai" Retour revienne à cet état,
+           ce qui déclenche popstate au lieu de quitter. */
+        function initBackGuard() {
+            history.pushState({ biblio: true }, '');
+        }
+
+        /* Affiche la modale et bloque la navigation. */
+        function showExitConfirm() {
+            document.getElementById('exitConfirmModal').style.display = 'flex';
+        }
+
+        /* Rester : repousse l'état factice pour que le prochain Retour
+           soit à nouveau intercepté. */
+        window.cancelExit = function () {
+            document.getElementById('exitConfirmModal').style.display = 'none';
+            history.pushState({ biblio: true }, '');
+        };
+
+        /* Quitter : laisse l'historique se dérouler normalement. */
+        window.confirmExit = function () {
+            _exitConfirmed = true;
+            document.getElementById('exitConfirmModal').style.display = 'none';
+            history.back(); // retour effectif
+        };
+
+        /* Gestionnaire popstate (bouton Retour natif / swipe) */
+        window.addEventListener('popstate', function (e) {
+            if (_exitConfirmed) return; // on a validé, on laisse passer
+            showExitConfirm();
+            // Repousse l'état pour que l'URL reste stable
+            history.pushState({ biblio: true }, '');
+        });
+
+        /* Gestionnaire Alt+Gauche (PC) */
+        document.addEventListener('keydown', function (e) {
+            if (e.altKey && e.key === 'ArrowLeft') {
+                e.preventDefault();
+                showExitConfirm();
+            }
+        });
+
+        /* Initialisation après chargement du DOM */
+        document.addEventListener('DOMContentLoaded', initBackGuard);
+    })();
+    </script>
+
     <!-- Modale confirmation déconnexion Drive -->
     <div id="disconnectConfirmModal" style="
         display:none; position:fixed; inset:0; z-index:11000;

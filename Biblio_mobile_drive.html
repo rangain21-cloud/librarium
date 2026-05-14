@@ -4991,13 +4991,27 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
             history.pushState({ biblio: true }, '');
         }
 
+        /* _sessionDirty : true uniquement si markUnsaved() a été appelé PENDANT
+           cette session (ajout/modif d'un livre). Ignoré si markSaved() a suivi.
+           Indépendant de appState.hasUnsavedChanges qui peut être restauré depuis
+           localStorage (session précédente) sans vraie modification en cours. */
+        let _sessionDirty = false;
+
+        document.addEventListener('DOMContentLoaded', function () {
+            const origMarkUnsaved = window.markUnsaved;
+            const origMarkSaved   = window.markSaved;
+            if (typeof origMarkUnsaved === 'function') {
+                window.markUnsaved = function () { _sessionDirty = true;  origMarkUnsaved.apply(this, arguments); };
+            }
+            if (typeof origMarkSaved === 'function') {
+                window.markSaved = function ()   { _sessionDirty = false; origMarkSaved.apply(this, arguments); };
+            }
+        });
+
         /* Affiche la modale en choisissant la bonne variante selon l'état des données. */
         function showExitConfirm() {
-            const hasUnsaved = !!(
-                typeof appState !== 'undefined' && appState.hasUnsavedChanges
-            );
-            document.getElementById('exitUnsaved').style.display = hasUnsaved ? '' : 'none';
-            document.getElementById('exitClean').style.display   = hasUnsaved ? 'none' : '';
+            document.getElementById('exitUnsaved').style.display = _sessionDirty ? '' : 'none';
+            document.getElementById('exitClean').style.display   = _sessionDirty ? 'none' : '';
             document.getElementById('exitConfirmModal').style.display = 'flex';
         }
 

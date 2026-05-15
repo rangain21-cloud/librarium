@@ -2688,14 +2688,21 @@
 
         /* ── Couche 5 : pageshow — retour via bfcache (bouton Précédent) ── */
         window.addEventListener('pageshow', function(e) {
-            // e.persisted = true → page restaurée depuis le cache du navigateur
+            if (!e.persisted) {
+                // Chargement initial (pas un retour bfcache) :
+                // on efface le flag localStorage résiduel d'une session précédente
+                // pour ne pas déclencher la popup "Modifications non sauvegardées" à tort.
+                try { localStorage.removeItem(UNSAVED_KEY); } catch(err) {}
+                appState.hasUnsavedChanges = false;
+                return;
+            }
+            // Retour via bfcache : vérifier si des modifs étaient réellement en attente
             const storedFlag = (function() {
                 try { return localStorage.getItem(UNSAVED_KEY) === '1'; } catch(e) { return false; }
             })();
             if (storedFlag) {
                 appState.hasUnsavedChanges = true;
                 _updateUnsavedIndicator();
-                // Légère temporisation pour que la page soit visible
                 setTimeout(showUnsavedPopup, 400);
             }
         });
@@ -4987,8 +4994,15 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
     (function () {
         let _exitConfirmed = false;
 
+        let _guardReady = false; // true dès que pushState initial est posé
+
         function initBackGuard() {
-            history.pushState({ biblio: true }, '');
+            // Petit délai pour laisser le reste du DOMContentLoaded se terminer
+            // avant de pousser l'état factice (évite de déclencher beforeunload au démarrage)
+            setTimeout(function () {
+                _guardReady = true;
+                history.pushState({ biblio: true }, '');
+            }, 0);
         }
 
         /* _sessionDirty : true uniquement si markUnsaved() a été appelé PENDANT
@@ -5050,6 +5064,7 @@ document.getElementById('filterRemarks').addEventListener('change', renderBooksT
         /* Gestionnaire popstate (bouton Retour natif / swipe) */
         window.addEventListener('popstate', function () {
             if (_exitConfirmed) return;
+            if (!_guardReady) return; // ignorer les popstate parasites au chargement
             showExitConfirm();
             history.pushState({ biblio: true }, '');
         });

@@ -2865,45 +2865,42 @@
     const currentFilters = getActiveFilters();
     const allBooks = appState.booksData;
 
-    // Fonction pour obtenir les options filtrées pour un champ donné
-    const getFilteredOptions = (field, excludeFilter) => {
-        const tempFilters = { ...currentFilters };
-        delete tempFilters[excludeFilter]; // Exclure le filtre en cours de mise à jour
-
+    // Applique tous les filtres sauf celui indiqué (pour calculer les options disponibles)
+    const getFilteredOptions = (field, excludeFilterKey) => {
         const filteredBooks = allBooks.filter(book => {
-            let match = true;
-            if (tempFilters.subject && book.Sujet !== tempFilters.subject) match = false;
-            if (tempFilters.author && book.Auteur !== tempFilters.author) match = false;
-            if (tempFilters.support && book.Support !== tempFilters.support) match = false;
-            if (tempFilters.year && book.AnnéeCopyright !== tempFilters.year) match = false;
-            if (tempFilters.title && !book.Titre.toLowerCase().includes(tempFilters.title.toLowerCase())) match = false;
-            return match;
+            if (excludeFilterKey !== 'subject' && currentFilters.subject && book.Sujet !== currentFilters.subject) return false;
+            if (excludeFilterKey !== 'author'  && currentFilters.author  && book.Auteur !== currentFilters.author)  return false;
+            if (excludeFilterKey !== 'support' && currentFilters.support && book.Support !== currentFilters.support) return false;
+            if (excludeFilterKey !== 'year'    && currentFilters.year    && String(book.AnnéeCopyright) !== String(currentFilters.year)) return false;
+            if (excludeFilterKey !== 'title'   && currentFilters.title   && !(book.Titre || '').toLowerCase().includes(currentFilters.title.toLowerCase())) return false;
+            if (excludeFilterKey !== 'remarks' && currentFilters.remarks && !(book.Remarques || '').toLowerCase().includes(currentFilters.remarks.toLowerCase())) return false;
+            return true;
         });
-        return [...new Set(filteredBooks.map(b => b[field]).filter(Boolean))].sort();
+        const values = [...new Set(filteredBooks.map(b => b[field]).filter(Boolean))];
+        // Tri : numérique pour l'année (décroissant), alphabétique sinon
+        if (field === 'AnnéeCopyright') return values.sort((a, b) => b - a);
+        return values.sort();
     };
 
-    if (changedFilterId === null || changedFilterId === 'filterAuthor' || changedFilterId === 'filterSupport') {
-        const subjects = getFilteredOptions('Sujet', 'subject');
-        populateSelect('filterSubject', subjects, '-- Tous les sujets --');
-    }
+    // Sujet — se recalcule selon tous les autres filtres
+    const subjects = getFilteredOptions('Sujet', 'subject');
+    populateSelect('filterSubject', subjects, '-- Tous les sujets --');
 
-    if (changedFilterId === null || changedFilterId === 'filterSubject' || changedFilterId === 'filterSupport') {
-        const authors = getFilteredOptions('Auteur', 'author');
-        populateDatalist('authorsList', authors);
-    }
+    // Auteur — datalist filtrée selon tous les autres filtres
+    const authors = getFilteredOptions('Auteur', 'author');
+    populateDatalist('authorsList', authors);
 
-    if (changedFilterId === null || changedFilterId === 'filterSubject' || changedFilterId === 'filterAuthor') {
-        const supports = getFilteredOptions('Support', 'support');
-        populateSelect('filterSupport', supports, '-- Tous les supports --');
-    }
+    // Support — se recalcule selon tous les autres filtres
+    const supports = getFilteredOptions('Support', 'support');
+    populateSelect('filterSupport', supports, '-- Tous les supports --');
 
-    if (changedFilterId === null) {
-        const years = [...new Set(allBooks.map(b => b.AnnéeCopyright).filter(Boolean))].sort((a, b) => b - a);
-        populateSelect('filterYear', years, '-- Toutes les années --');
-        
-        const remarks = [...new Set(allBooks.map(b => b.Remarques).filter(Boolean))].sort();
-        populateDatalist('remarksList', remarks);
-    }
+    // Année — se recalcule selon tous les autres filtres
+    const years = getFilteredOptions('AnnéeCopyright', 'year');
+    populateSelect('filterYear', years, '-- Toutes les années --');
+
+    // Remarques — datalist filtrée selon tous les autres filtres
+    const remarks = getFilteredOptions('Remarques', 'remarks');
+    populateDatalist('remarksList', remarks);
 }
 
 // Remplir un select avec des options (mise à jour pour gérer le libellé par défaut)
@@ -2936,22 +2933,33 @@ function populateDatalist(datalistId, options) {
     });
 }
 
-	// Ajouter les écouteurs d'événements pour les filtres
-	document.getElementById('filterSubject').addEventListener('change', function() {
-	    updateFilters('filterSubject');
-	    renderBooksTable();
-	});
-	document.getElementById('filterAuthor').addEventListener('input', function() {
-	    renderBooksTable();
-	});
-	document.getElementById('filterSupport').addEventListener('change', function() {
-	    updateFilters('filterSupport');
-	    renderBooksTable();
-	});
-	document.getElementById('filterYear').addEventListener('change', renderBooksTable);
-	document.getElementById('filterTitle').addEventListener('input', renderBooksTable);
-	document.getElementById('filterRemarks').addEventListener('input', renderBooksTable);
-	document.getElementById('filterRemarks').addEventListener('change', renderBooksTable);
+        // Écouteurs d'événements pour les filtres (version unifiée — sans doublons)
+        ['filterSubject', 'filterSupport', 'filterYear'].forEach(function(id) {
+            document.getElementById(id).addEventListener('change', function() {
+                updateFilters();
+                renderBooksTable();
+            });
+        });
+        document.getElementById('filterAuthor').addEventListener('input', function() {
+            updateFilters();
+            renderBooksTable();
+        });
+        document.getElementById('filterAuthor').addEventListener('change', function() {
+            updateFilters();
+            renderBooksTable();
+        });
+        document.getElementById('filterTitle').addEventListener('input', function() {
+            updateFilters();
+            renderBooksTable();
+        });
+        document.getElementById('filterRemarks').addEventListener('input', function() {
+            updateFilters();
+            renderBooksTable();
+        });
+        document.getElementById('filterRemarks').addEventListener('change', function() {
+            updateFilters();
+            renderBooksTable();
+        });
 
 
         // Remplir les listes déroulantes du formulaire d'ouvrage
@@ -3005,9 +3013,9 @@ function populateDatalist(datalistId, options) {
 
                 // Sinon, appliquer les filtres classiques du bandeau vertical
                 if (filters.subject && book.Sujet !== filters.subject) return false;
-                if (filters.author && book.Auteur !== filters.author) return false;
+                if (filters.author && !(book.Auteur || '').toLowerCase().includes(filters.author.toLowerCase())) return false;
                 if (filters.support && book.Support !== filters.support) return false;
-                if (filters.year && book.AnnéeCopyright !== filters.year) return false;
+                if (filters.year && String(book.AnnéeCopyright) !== String(filters.year)) return false;
                 if (filters.title && !book.Titre.toLowerCase().includes(filters.title.toLowerCase())) return false;
                 if (filters.remarks) {
                     const bookRemarks = (book.Remarques || "").toLowerCase();
@@ -3460,14 +3468,7 @@ function populateDatalist(datalistId, options) {
             renderBooksTable();
         });
 
-        // Ajouter des écouteurs aux filtres
-        document.getElementById('filterSubject').addEventListener('change', renderBooksTable);
-        document.getElementById('filterAuthor').addEventListener('change', renderBooksTable);
-        document.getElementById('filterSupport').addEventListener('change', renderBooksTable);
-        document.getElementById('filterYear').addEventListener('change', renderBooksTable);
-        document.getElementById('filterTitle').addEventListener('input', renderBooksTable);
-document.getElementById('filterRemarks').addEventListener('input', renderBooksTable);
-document.getElementById('filterRemarks').addEventListener('change', renderBooksTable);
+        // (écouteurs de filtres déjà déclarés plus haut — voir "version unifiée")
 
         // --- Gestion des Auteurs ---
 

@@ -2099,6 +2099,9 @@
             <button id="burgerDriveSaveBtn" onclick="saveAllToDrive(); closeBurgerMenu();" disabled style="background:#fbbc04;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;opacity:0.5;">
                 ⬆️ Sauver sur Drive
             </button>
+            <button onclick="testDrive(); closeBurgerMenu();" style="background:#c0392b;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;">
+                🔍 Test Drive
+            </button>
         </div>
 
         <!-- Navigation -->
@@ -4806,33 +4809,99 @@ function populateDatalist(datalistId, options) {
     }
 
     function openFilterDrawer() {
-        // Clone sidebar content into the drawer
-        const sidebar = document.querySelector('.left-sidebar');
         const drawerContent = document.getElementById('filterDrawerContent');
-        if (sidebar && drawerContent) {
-            drawerContent.innerHTML = sidebar.innerHTML;
-            // Re-bind events on cloned inputs/selects by mirroring changes to originals
-            drawerContent.querySelectorAll('select, input[type="text"]').forEach(el => {
-                const origId = el.id;
-                if (!origId) return;
-                const orig = document.getElementById(origId);
-                if (!orig) return;
-                el.value = orig.value;
-                el.addEventListener('change', () => { orig.value = el.value; orig.dispatchEvent(new Event('change')); });
-                el.addEventListener('input',  () => { orig.value = el.value; orig.dispatchEvent(new Event('input')); });
-            });
-            // Re-bind buttons
-            drawerContent.querySelectorAll('button').forEach(btn => {
-                const origId = btn.id;
-                if (!origId) return;
-                const orig = document.getElementById(origId);
-                if (orig) {
-                    btn.onclick = () => { orig.click(); };
-                    btn.disabled = orig.disabled;
-                    btn.className = orig.className;
-                }
-            });
+        if (!drawerContent) return;
+
+        /* ── Helpers ── */
+        function buildSelect(origId, labelText) {
+            const orig = document.getElementById(origId);
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'margin-bottom:0.8rem;';
+            const lbl = document.createElement('label');
+            lbl.textContent = labelText;
+            lbl.style.cssText = 'display:block;font-weight:600;margin-bottom:0.3rem;font-size:0.9rem;color:#2c3e50;';
+            wrapper.appendChild(lbl);
+            const sel = document.createElement('select');
+            sel.style.cssText = 'width:100%;padding:0.5rem;border:1px solid #bdc3c7;border-radius:6px;font-size:0.95rem;min-height:44px;';
+            if (orig) {
+                Array.from(orig.options).forEach(function(opt) {
+                    const o = document.createElement('option');
+                    o.value = opt.value;
+                    o.textContent = opt.textContent;
+                    if (opt.selected) o.selected = true;
+                    sel.appendChild(o);
+                });
+                sel.addEventListener('change', function() {
+                    orig.value = this.value;
+                    orig.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+            wrapper.appendChild(sel);
+            return wrapper;
         }
+
+        function buildTextInput(origId, labelText, datalistId) {
+            const orig = document.getElementById(origId);
+            const wrapper = document.createElement('div');
+            wrapper.style.cssText = 'margin-bottom:0.8rem;';
+            const lbl = document.createElement('label');
+            lbl.textContent = labelText;
+            lbl.style.cssText = 'display:block;font-weight:600;margin-bottom:0.3rem;font-size:0.9rem;color:#2c3e50;';
+            wrapper.appendChild(lbl);
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.style.cssText = 'width:100%;padding:0.5rem;border:1px solid #bdc3c7;border-radius:6px;font-size:0.95rem;min-height:44px;box-sizing:border-box;';
+            if (orig) inp.value = orig.value;
+            if (datalistId) {
+                const origDl = document.getElementById(datalistId);
+                const dlId = datalistId + '_drawer';
+                inp.setAttribute('list', dlId);
+                const dl = document.createElement('datalist');
+                dl.id = dlId;
+                if (origDl) {
+                    Array.from(origDl.options).forEach(function(opt) {
+                        const o = document.createElement('option');
+                        o.value = opt.value;
+                        dl.appendChild(o);
+                    });
+                }
+                wrapper.appendChild(dl);
+            }
+            if (orig) {
+                inp.addEventListener('input', function() {
+                    orig.value = this.value;
+                    orig.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+                inp.addEventListener('change', function() {
+                    orig.value = this.value;
+                    orig.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+            }
+            wrapper.appendChild(inp);
+            return wrapper;
+        }
+
+        /* ── Construction du contenu ── */
+        drawerContent.innerHTML = '';
+        drawerContent.appendChild(buildSelect('filterSubject', 'Liste par sujet'));
+        drawerContent.appendChild(buildTextInput('filterAuthor', 'Liste par auteur', 'authorsList'));
+        drawerContent.appendChild(buildSelect('filterSupport', 'Liste par support'));
+        drawerContent.appendChild(buildSelect('filterYear', 'Liste par année de parution'));
+        drawerContent.appendChild(buildTextInput('filterTitle', 'Mot clé du titre', null));
+        drawerContent.appendChild(buildTextInput('filterRemarks', 'Remarques', 'remarksList'));
+
+        /* ── Bouton Effacer les filtres ── */
+        const clearBtn = document.createElement('button');
+        clearBtn.textContent = 'Effacer les filtres';
+        clearBtn.style.cssText = 'width:100%;margin-top:0.5rem;padding:0.65rem;background:#e74c3c;color:white;border:none;border-radius:8px;font-size:0.95rem;font-weight:600;cursor:pointer;min-height:44px;';
+        clearBtn.addEventListener('click', function() {
+            document.getElementById('btnClearFilters').click();
+            drawerContent.querySelectorAll('select').forEach(function(s) { s.value = ''; });
+            drawerContent.querySelectorAll('input[type="text"]').forEach(function(i) { i.value = ''; });
+            closeFilterDrawer();
+        });
+        drawerContent.appendChild(clearBtn);
+
         document.getElementById('filterDrawer').classList.add('open');
         document.getElementById('filterOverlay').classList.add('open');
         document.body.style.overflow = 'hidden';
@@ -5116,9 +5185,7 @@ function populateDatalist(datalistId, options) {
         </div>
     </div>
 
-    <button onclick="testDrive()" style="position:fixed;bottom:80px;right:10px;z-index:9999;padding:15px;background:red;color:white;font-weight:bold;border-radius:10px;box-shadow:0 2px 8px rgba(0,0,0,0.3);">
-        🔍 TEST DRIVE
-    </button>
+
 
 </body>
 </html>

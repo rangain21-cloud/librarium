@@ -2562,27 +2562,138 @@
         };
 
         /* ════════════════════════════════════════════════════════════════
-           GESTION DES MODIFICATIONS NON SAUVEGARDÉES — V6
-           Stratégie multicouche (mobile swipe + PC fermeture couverts) :
-           1. localStorage  → survit à toute navigation, swipe, crash
+           GESTION DES MODIFICATIONS NON SAUVEGARDÉES — V7
+           Stratégie multicouche :
+           1. localStorage DATA  → sauvegarde automatique des données à chaque modif
            2. Indicateur visuel permanent dans la top-bar
-           3. beforeunload  → boîte native PC (quand l'interaction suffit)
-           4. visibilitychange → pop-up au retour sur l'onglet/l'app
-           5. pageshow      → pop-up après navigation arrière (bfcache)
+           3. beforeunload       → boîte native PC
+           4. visibilitychange   → pop-up au retour sur l'onglet
+           5. pageshow           → restauration après navigation arrière (bfcache)
            ════════════════════════════════════════════════════════════════ */
 
-        const UNSAVED_KEY = 'biblioUnsavedOuvrages'; // clé localStorage
+        const UNSAVED_KEY      = 'biblioUnsavedOuvrages';      // flag modif en attente
+        const AUTOSAVE_KEY     = 'biblioAutosaveData';          // données JSON
+        const AUTOSAVE_FILE_KEY= 'biblioAutosaveFilename';      // nom du fichier CSV d'origine
+        const AUTOSAVE_TS_KEY  = 'biblioAutosaveTimestamp';     // horodatage
+
+        /* ── Sauvegarde automatique des données dans localStorage ── */
+        function _autosaveData() {
+            try {
+                if (!appState.booksData || appState.booksData.length === 0) return;
+                localStorage.setItem(AUTOSAVE_KEY,      JSON.stringify(appState.booksData));
+                localStorage.setItem(AUTOSAVE_FILE_KEY, appState.booksFilename || 'ouvrages.csv');
+                localStorage.setItem(AUTOSAVE_TS_KEY,   new Date().toISOString());
+            } catch(e) {
+                console.warn('Autosave localStorage échoué (quota ?):', e);
+            }
+        }
+
+        /* ── Effacer la sauvegarde automatique ── */
+        function _clearAutosave() {
+            try {
+                localStorage.removeItem(AUTOSAVE_KEY);
+                localStorage.removeItem(AUTOSAVE_FILE_KEY);
+                localStorage.removeItem(AUTOSAVE_TS_KEY);
+            } catch(e) {}
+        }
 
         function markUnsaved() {
             appState.hasUnsavedChanges = true;
             try { localStorage.setItem(UNSAVED_KEY, '1'); } catch(e) {}
+            _autosaveData();   // ← sauvegarde les données immédiatement
             _updateUnsavedIndicator();
         }
 
         function markSaved() {
             appState.hasUnsavedChanges = false;
             try { localStorage.removeItem(UNSAVED_KEY); } catch(e) {}
+            _clearAutosave();  // ← données sauvées dans le fichier, plus besoin du cache
             _updateUnsavedIndicator();
+        }
+
+        /* ── Restauration au démarrage si une sauvegarde automatique existe ── */
+        function _checkAutosaveOnLoad() {
+            let savedData, savedFile, savedTs;
+            try {
+                const flag = localStorage.getItem(UNSAVED_KEY);
+                if (flag !== '1') return; // pas de modifs en attente : rien à faire
+                savedData = localStorage.getItem(AUTOSAVE_KEY);
+                savedFile = localStorage.getItem(AUTOSAVE_FILE_KEY) || 'ouvrages.csv';
+                savedTs   = localStorage.getItem(AUTOSAVE_TS_KEY);
+            } catch(e) { return; }
+
+            if (!savedData) return;
+
+            let parsed;
+            try { parsed = JSON.parse(savedData); } catch(e) { return; }
+            if (!Array.isArray(parsed) || parsed.length === 0) return;
+
+            // Formater l'horodatage lisiblement
+            let tsLabel = '';
+            if (savedTs) {
+                try {
+                    const d = new Date(savedTs);
+                    tsLabel = d.toLocaleDateString('fr-FR') + ' à ' + d.toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'});
+                } catch(e) {}
+            }
+
+            // Afficher la modale de restauration
+            _showRestoreModal(parsed, savedFile, tsLabel, parsed.length);
+        }
+
+        function _showRestoreModal(data, filename, tsLabel, count) {
+            const overlay = document.createElement('div');
+            overlay.id = 'autosaveRestoreOverlay';
+            overlay.style.cssText = 'position:fixed;inset:0;z-index:25000;background:rgba(0,0,0,0.65);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:1rem;';
+            overlay.innerHTML = `
+                <div style="background:#fff;border-radius:16px;padding:2rem 1.8rem 1.6rem;max-width:420px;width:100%;box-shadow:0 12px 48px rgba(0,0,0,0.35);animation:slideInModal .25s ease;">
+                    <div style="font-size:3rem;text-align:center;margin-bottom:0.4rem;">🔄</div>
+                    <h3 style="margin:0 0 0.4rem;text-align:center;color:#c0392b;font-size:1.15rem;">
+                        Session non sauvegardée retrouvée
+                    </h3>
+                    <p style="margin:0 0 0.3rem;font-size:0.9rem;color:#555;text-align:center;line-height:1.55;">
+                        <strong>${count} livre(s)</strong> — fichier : <em>${filename}</em>
+                    </p>
+                    ${tsLabel ? `<p style="margin:0 0 1.2rem;font-size:0.82rem;color:#888;text-align:center;">Dernière modification : ${tsLabel}</p>` : '<div style="margin-bottom:1.2rem;"></div>'}
+                    <div style="display:flex;flex-direction:column;gap:0.6rem;">
+                        <button id="btnRestoreAutosave" style="width:100%;padding:0.8rem;border:none;background:#27ae60;border-radius:9px;cursor:pointer;font-size:0.97rem;color:#fff;font-weight:700;box-shadow:0 2px 8px rgba(39,174,96,0.35);">
+                            ✅ Restaurer ces données
+                        </button>
+                        <button id="btnDiscardAutosave" style="width:100%;padding:0.7rem;border:1px solid #bdc3c7;background:#ecf0f1;border-radius:9px;cursor:pointer;font-size:0.9rem;color:#666;font-weight:500;">
+                            🗑️ Ignorer et repartir de zéro
+                        </button>
+                    </div>
+                </div>`;
+            document.body.appendChild(overlay);
+
+            document.getElementById('btnRestoreAutosave').addEventListener('click', function() {
+                overlay.remove();
+                appState.booksData     = data;
+                appState.booksFilename = filename;
+                appState.hasUnsavedChanges = true;
+                try { localStorage.setItem(UNSAVED_KEY, '1'); } catch(e) {}
+                updateFilters();
+                renderBooksTable();
+                populateBookForm();
+                updateButtonStates();
+                _updateUnsavedIndicator();
+                // Petit toast de confirmation
+                _showRestoreToast('✅ ' + count + ' livre(s) restauré(s) — pensez à sauvegarder !');
+            });
+
+            document.getElementById('btnDiscardAutosave').addEventListener('click', function() {
+                overlay.remove();
+                _clearAutosave();
+                try { localStorage.removeItem(UNSAVED_KEY); } catch(e) {}
+            });
+        }
+
+        function _showRestoreToast(msg) {
+            const t = document.createElement('div');
+            t.textContent = msg;
+            t.style.cssText = 'position:fixed;bottom:1.5rem;left:50%;transform:translateX(-50%);background:#27ae60;color:#fff;padding:0.65rem 1.5rem;border-radius:9px;font-size:0.92rem;font-weight:600;z-index:26000;box-shadow:0 4px 18px rgba(0,0,0,0.25);white-space:nowrap;transition:opacity .4s;';
+            document.body.appendChild(t);
+            setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 450); }, 3500);
         }
 
         /* ── Indicateur visuel dans la top-bar ─────────────────────────── */
@@ -2689,24 +2800,22 @@
             }
         });
 
-        /* ── Couche 5 : pageshow — retour via bfcache (bouton Précédent) ── */
+        /* ── Couche 5 : pageshow — chargement initial + retour bfcache ── */
         window.addEventListener('pageshow', function(e) {
             if (!e.persisted) {
-                // Chargement initial (pas un retour bfcache) :
-                // on efface le flag localStorage résiduel d'une session précédente
-                // pour ne pas déclencher la popup "Modifications non sauvegardées" à tort.
-                try { localStorage.removeItem(UNSAVED_KEY); } catch(err) {}
-                appState.hasUnsavedChanges = false;
+                // Chargement initial : vérifier si une autosauvegarde existe
+                // (cas fermeture brutale de l'onglet, Ctrl+R, etc.)
+                setTimeout(_checkAutosaveOnLoad, 300);
                 return;
             }
-            // Retour via bfcache : vérifier si des modifs étaient réellement en attente
+            // Retour via bfcache (bouton Précédent) : vérifier les modifs en attente
             const storedFlag = (function() {
                 try { return localStorage.getItem(UNSAVED_KEY) === '1'; } catch(e) { return false; }
             })();
             if (storedFlag) {
                 appState.hasUnsavedChanges = true;
                 _updateUnsavedIndicator();
-                setTimeout(showUnsavedPopup, 400);
+                setTimeout(_checkAutosaveOnLoad, 300);
             }
         });
 

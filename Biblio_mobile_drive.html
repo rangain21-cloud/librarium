@@ -5003,23 +5003,31 @@ function populateDatalist(datalistId, options) {
                 <h3 style="margin:0 0 0.5rem; text-align:center; color:#c0392b; font-size:1.1rem;">
                     Modifications non sauvegardées
                 </h3>
-                <p style="margin:0 0 1.2rem; color:#666; font-size:0.9rem; text-align:center; line-height:1.5;">
+                <p style="margin:0 0 1rem; color:#666; font-size:0.9rem; text-align:center; line-height:1.5;">
                     Vous avez des modifications en attente.<br>
                     Sauvegardez avant de quitter.
                 </p>
-                <div style="display:flex; flex-direction:column; gap:0.65rem;">
-                    <button onclick="exitSaveAndLeave()" style="
+                <div style="display:flex; flex-direction:column; gap:0.55rem;">
+                    <!-- Bouton Sauvegarder sur Drive (visible si Drive connecté) -->
+                    <button id="exitSaveDriveBtn" onclick="exitSaveAndLeave()" style="
                         width:100%; padding:0.75rem; border:none;
                         background:#27ae60; border-radius:9px; cursor:pointer;
-                        font-size:0.95rem; color:white; font-weight:700;">
-                        💾 Sauvegarder et quitter
+                        font-size:0.95rem; color:white; font-weight:700; display:none;">
+                        ☁️ Sauver sur Drive et quitter
+                    </button>
+                    <!-- Bouton Sauvegarder localement (toujours visible si données chargées) -->
+                    <button id="exitSaveLocalBtn" onclick="exitSaveLocalAndLeave()" style="
+                        width:100%; padding:0.75rem; border:none;
+                        background:#2980b9; border-radius:9px; cursor:pointer;
+                        font-size:0.95rem; color:white; font-weight:700; display:none;">
+                        💾 Sauver localement et quitter
                     </button>
                     <div style="display:flex; gap:0.65rem;">
                         <button onclick="cancelExit()" style="
                             flex:1; padding:0.75rem; border:1px solid #bdc3c7;
                             background:#ecf0f1; border-radius:9px; cursor:pointer;
                             font-size:0.95rem; color:#555; font-weight:500;">
-                            Rester
+                            ← Rester
                         </button>
                         <button onclick="confirmExit()" style="
                             flex:1; padding:0.75rem; border:none;
@@ -5060,27 +5068,24 @@ function populateDatalist(datalistId, options) {
     </div>
 
     <script>
-    /* ── Garde de sortie : bouton Retour (mobile) et Alt+Gauche (PC) ── */
+    /* ════════════════════════════════════════════════════════════════════
+       GARDE DE SORTIE — Android (bouton Retour) + PC (Retour, rechargement,
+       fermeture d'onglet, navigation externe, Alt+←, Backspace nav)
+       ════════════════════════════════════════════════════════════════════ */
     (function () {
         let _exitConfirmed = false;
+        let _guardReady    = false;
+        let _sessionDirty  = false;
 
-        let _guardReady = false; // true dès que pushState initial est posé
-
+        /* ── Initialisation : état factice dans l'historique ── */
         function initBackGuard() {
-            // Petit délai pour laisser le reste du DOMContentLoaded se terminer
-            // avant de pousser l'état factice (évite de déclencher beforeunload au démarrage)
             setTimeout(function () {
                 _guardReady = true;
                 history.pushState({ biblio: true }, '');
             }, 0);
         }
 
-        /* _sessionDirty : true uniquement si markUnsaved() a été appelé PENDANT
-           cette session (ajout/modif d'un livre). Ignoré si markSaved() a suivi.
-           Indépendant de appState.hasUnsavedChanges qui peut être restauré depuis
-           localStorage (session précédente) sans vraie modification en cours. */
-        let _sessionDirty = false;
-
+        /* ── Wrapping de markUnsaved / markSaved ── */
         document.addEventListener('DOMContentLoaded', function () {
             const origMarkUnsaved = window.markUnsaved;
             const origMarkSaved   = window.markSaved;
@@ -5088,64 +5093,163 @@ function populateDatalist(datalistId, options) {
                 window.markUnsaved = function () { _sessionDirty = true;  origMarkUnsaved.apply(this, arguments); };
             }
             if (typeof origMarkSaved === 'function') {
-                window.markSaved = function ()   { _sessionDirty = false; origMarkSaved.apply(this, arguments); };
+                window.markSaved   = function () { _sessionDirty = false; origMarkSaved.apply(this, arguments); };
             }
         });
 
-        /* Affiche la modale en choisissant la bonne variante selon l'état des données. */
+        /* ── Affichage de la modale ── */
         function showExitConfirm() {
             document.getElementById('exitUnsaved').style.display = _sessionDirty ? '' : 'none';
             document.getElementById('exitClean').style.display   = _sessionDirty ? 'none' : '';
+
+            // Afficher les boutons de sauvegarde disponibles
+            if (_sessionDirty) {
+                // Drive : disponible si le bouton driveSaveBtn n'est pas désactivé
+                const driveBtn  = document.getElementById('driveSaveBtn');
+                const driveOk   = driveBtn && !driveBtn.disabled;
+                const exitDrive = document.getElementById('exitSaveDriveBtn');
+                if (exitDrive) exitDrive.style.display = driveOk ? '' : 'none';
+
+                // Local : disponible si des données livres sont chargées
+                const booksOk   = window.appState && window.appState.booksData && window.appState.booksData.length > 0;
+                const exitLocal = document.getElementById('exitSaveLocalBtn');
+                if (exitLocal) exitLocal.style.display = booksOk ? '' : 'none';
+            }
+
             document.getElementById('exitConfirmModal').style.display = 'flex';
         }
 
-        /* Rester : ferme la modale et repousse l'état factice. */
+        /* ── Sauvegarde locale puis quitter ── */
+        window.exitSaveLocalAndLeave = function () {
+            document.getElementById('exitConfirmModal').style.display = 'none';
+            const btnSaveBooks = document.getElementById('btnSaveBooks');
+            if (btnSaveBooks) {
+                btnSaveBooks.click();
+                setTimeout(function () { _exitConfirmed = true; history.back(); }, 700);
+            } else {
+                _exitConfirmed = true;
+                history.back();
+            }
+        };
+
+        /* ── Actions de la modale ── */
         window.cancelExit = function () {
             document.getElementById('exitConfirmModal').style.display = 'none';
             history.pushState({ biblio: true }, '');
         };
 
-        /* Quitter sans sauvegarder. */
         window.confirmExit = function () {
             _exitConfirmed = true;
             document.getElementById('exitConfirmModal').style.display = 'none';
             history.back();
         };
 
-        /* Sauvegarder sur Drive puis quitter. */
         window.exitSaveAndLeave = function () {
             document.getElementById('exitConfirmModal').style.display = 'none';
-            // Déclenche la sauvegarde Drive existante
-            const saveBtn = document.getElementById('driveSaveBtn');
+            // Tenter sauvegarde locale d'abord
+            const btnSaveBooks = document.getElementById('btnSaveBooks');
+            const saveBtn      = document.getElementById('driveSaveBtn');
             if (saveBtn && !saveBtn.disabled) {
                 saveBtn.click();
-                // Attend un court délai pour que la sauvegarde démarre, puis quitte
-                setTimeout(function () {
-                    _exitConfirmed = true;
-                    history.back();
-                }, 800);
+                setTimeout(function () { _exitConfirmed = true; history.back(); }, 900);
+            } else if (btnSaveBooks && !btnSaveBooks.disabled) {
+                btnSaveBooks.click();
+                setTimeout(function () { _exitConfirmed = true; history.back(); }, 600);
             } else {
-                // Pas de connexion Drive disponible : quitter directement
                 _exitConfirmed = true;
                 history.back();
             }
         };
 
-        /* Gestionnaire popstate (bouton Retour natif / swipe) */
+        /* ── Couche 1 : popstate — bouton Retour (Android + PC) ── */
         window.addEventListener('popstate', function () {
             if (_exitConfirmed) return;
-            if (!_guardReady) return; // ignorer les popstate parasites au chargement
+            if (!_guardReady)   return;
             showExitConfirm();
             history.pushState({ biblio: true }, '');
         });
 
-        /* Gestionnaire Alt+Gauche (PC) */
+        /* ── Couche 2 : beforeunload — fermeture onglet/fenêtre, navigation externe,
+                         Ctrl+W, Ctrl+R, saisie dans la barre d'adresse (PC)
+           Les navigateurs modernes n'autorisent plus de message personnalisé
+           dans cette boîte, mais son affichage bloque bien la sortie. ── */
+        window.addEventListener('beforeunload', function (e) {
+            if (_sessionDirty) {
+                e.preventDefault();
+                e.returnValue = 'Vous avez des modifications non sauvegardées. Quitter sans sauvegarder ?';
+            }
+        });
+
+        /* ── Couche 3 : clavier PC ── */
         document.addEventListener('keydown', function (e) {
+            if (!_sessionDirty) return;
+
+            // Alt+← : navigation Précédent
             if (e.altKey && e.key === 'ArrowLeft') {
                 e.preventDefault();
                 showExitConfirm();
+                return;
+            }
+
+            // Backspace hors champ de saisie : navigation Précédent sur certains navigateurs
+            if (e.key === 'Backspace') {
+                const tag = document.activeElement ? document.activeElement.tagName : '';
+                const editable = document.activeElement && document.activeElement.isContentEditable;
+                if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT' && !editable) {
+                    e.preventDefault();
+                    showExitConfirm();
+                    return;
+                }
+            }
+
+            // Ctrl+R / F5 : rechargement — on peut seulement déclencher beforeunload (déjà couvert)
+            // On ajoute ici une confirmation supplémentaire via la modale pour F5 (focus sur page)
+            if ((e.ctrlKey && e.key === 'r') || e.key === 'F5') {
+                e.preventDefault();
+                showExitConfirm();
+                // Si l'utilisateur confirme (confirmExit), on laisse partir via history.back() ;
+                // mais pour un rechargement on doit reload. On adapte confirmExit dynamiquement.
+                window._exitAction = 'reload';
             }
         });
+
+        /* ── Couche 4 : liens <a> internes/externes non gérés autrement ── */
+        document.addEventListener('click', function (e) {
+            if (!_sessionDirty) return;
+            const a = e.target.closest('a[href]');
+            if (!a) return;
+            const href = a.getAttribute('href');
+            if (!href || href === '#' || href.startsWith('javascript')) return;
+            e.preventDefault();
+            window._exitAction = function () { window.location.href = href; };
+            showExitConfirm();
+        }, true);
+
+        /* ── Patch confirmExit pour gérer reload ou navigation href ── */
+        const _origConfirmExit = window.confirmExit;
+        window.confirmExit = function () {
+            _exitConfirmed = true;
+            document.getElementById('exitConfirmModal').style.display = 'none';
+            if (window._exitAction === 'reload') {
+                window._exitAction = null;
+                window.location.reload();
+            } else if (typeof window._exitAction === 'function') {
+                const action = window._exitAction;
+                window._exitAction = null;
+                action();
+            } else {
+                window._exitAction = null;
+                history.back();
+            }
+        };
+
+        // Réinitialiser _exitAction à chaque annulation
+        const _origCancelExit = window.cancelExit;
+        window.cancelExit = function () {
+            window._exitAction = null;
+            document.getElementById('exitConfirmModal').style.display = 'none';
+            history.pushState({ biblio: true }, '');
+        };
 
         document.addEventListener('DOMContentLoaded', initBackGuard);
     })();

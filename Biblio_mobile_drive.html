@@ -2513,8 +2513,9 @@
                 <h2 id="resultModalTitle">Ouvrages sélectionnés</h2>
                 <button class="close-btn" onclick="closeResultModal()">&times;</button>
             </div>
-            <div style="overflow: auto; height: calc(100% - 120px); padding: 20px;">
-                <table id="resultTable" class="books-table">
+            <div style="overflow-y: auto; overflow-x: hidden; height: calc(100% - 120px); padding: 20px 20px 20px 20px;">
+                <div style="overflow-x: auto; width: 100%; padding-bottom: 6px;">
+                <table id="resultTable" class="books-table" style="white-space: nowrap; min-width: max-content;">
                     <thead>
                         <tr>
                             <th>Date Emprunt</th>
@@ -2537,6 +2538,7 @@
                     </thead>
                     <tbody id="resultTableBody"></tbody>
                 </table>
+                </div><!-- fin overflow-x wrapper -->
             </div>
             <div class="modal-footer">
                 <button class="btn-save" onclick="exportResultList()">Exporter cette liste de lecture</button>

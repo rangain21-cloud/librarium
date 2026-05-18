@@ -5074,6 +5074,12 @@ function populateDatalist(datalistId, options) {
     }
 
     function showDisconnectConfirm() {
+        // Afficher l'avertissement uniquement si des modifications sont en attente
+        const hasUnsaved = window.appState && window.appState.hasUnsavedChanges;
+        const warning = document.getElementById('disconnectUnsavedWarning');
+        const icon    = document.getElementById('disconnectModalIcon');
+        if (warning) warning.style.display = hasUnsaved ? '' : 'none';
+        if (icon)    icon.textContent       = hasUnsaved ? '⚠️' : '☁️';
         document.getElementById('disconnectConfirmModal').style.display = 'flex';
     }
 
@@ -5373,10 +5379,17 @@ function populateDatalist(datalistId, options) {
             background:#fff; border-radius:14px; padding:1.6rem 1.4rem;
             max-width:340px; width:100%; box-shadow:0 8px 32px rgba(0,0,0,0.25);
             animation: slideInModal 0.2s ease;">
-            <div style="font-size:2.2rem; text-align:center; margin-bottom:0.6rem;">☁️</div>
+            <div id="disconnectModalIcon" style="font-size:2.2rem; text-align:center; margin-bottom:0.6rem;">☁️</div>
             <h3 style="margin:0 0 0.5rem; text-align:center; color:#2c3e50; font-size:1.1rem;">
-                Se déconnecter de Google Drive ?
+                ⚠️ Déconnecter Google Drive ?
             </h3>
+            <!-- Message affiché uniquement si modifications non sauvegardées -->
+            <p id="disconnectUnsavedWarning" style="
+                display:none; margin:0 0 0.75rem; padding:0.6rem 0.8rem;
+                background:#fdf3f2; border:1px solid #e74c3c; border-radius:8px;
+                color:#c0392b; font-size:0.88rem; text-align:center; line-height:1.5;">
+                Les modifications non sauvegardées<br>ne seront pas synchronisées.
+            </p>
             <p style="margin:0 0 1.2rem; color:#666; font-size:0.9rem; text-align:center; line-height:1.5;">
                 Les données locales sont conservées.<br>
                 Vous devrez vous reconnecter pour synchroniser.

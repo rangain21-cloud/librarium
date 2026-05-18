@@ -2020,18 +2020,22 @@
         <!-- Titre visible sur mobile -->
         <span class="top-bar-title" style="color:white; font-weight:700; font-size:1.05rem; letter-spacing:0.01em;">📚 BiblioApp</span>
 
-        <label class="file-input-label disabled" id="labelFileOuvrages">
-            Sélectionner le fichier des ouvrages
-            <input type="file" id="fileOuvrages" accept=".csv">
-        </label>
-        <label class="file-input-label disabled" id="labelFileAuthors">
-            Charger le fichier des auteurs
-            <input type="file" id="fileAuthors" accept=".csv">
-        </label>
-        <label class="file-input-label disabled" id="labelFileLecteurs">
-            Sélectionner le fichier des lecteurs
-            <input type="file" id="fileLecteurs" accept=".csv">
-        </label>
+        <!-- Pavé "Charger les fichiers locaux" -->
+        <div style="display:flex; align-items:center; gap:0.4rem; border:1px solid #bdc3c7; border-radius:8px; padding:0.3rem 0.6rem 0.3rem 0.5rem; background:#f4f6f7;">
+            <span style="font-size:0.72rem; font-weight:700; color:#7f8c8d; white-space:nowrap; letter-spacing:0.02em; margin-right:0.2rem; writing-mode:horizontal-tb;">📂 Charger les fichiers locaux</span>
+            <label class="file-input-label disabled" id="labelFileOuvrages">
+                📖 Ouvrages (.csv)
+                <input type="file" id="fileOuvrages" accept=".csv">
+            </label>
+            <label class="file-input-label disabled" id="labelFileAuthors">
+                ✍️ Auteurs (.csv)
+                <input type="file" id="fileAuthors" accept=".csv">
+            </label>
+            <label class="file-input-label disabled" id="labelFileLecteurs">
+                👤 Lecteurs (.csv)
+                <input type="file" id="fileLecteurs" accept=".csv">
+            </label>
+        </div>
         
         <!-- 📁 GOOGLE DRIVE SECTION -->
         <div style="display:flex; gap:0.5rem; align-items:center; border-left:2px solid #ccc; padding-left:1rem; margin-left:0.5rem;">

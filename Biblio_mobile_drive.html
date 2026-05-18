@@ -1276,12 +1276,18 @@
             padding: 0.5rem 0.5rem;
         }
 
-        /* Modale "Ouvrages sélectionnés" : cellules complètes, sans troncature */
-        #resultTable td {
+        /* Modale "Ouvrages sélectionnés" : colonnes à largeur naturelle, scroll horizontal */
+        #resultTable {
+            table-layout: auto;
+            width: max-content;
+        }
+        #resultTable td,
+        #resultTable th {
             white-space: nowrap;
-            overflow: visible;
-            text-overflow: clip;
+            overflow: hidden;
+            text-overflow: unset;
             max-width: none;
+            min-width: fit-content;
         }
 
         tbody tr:hover {

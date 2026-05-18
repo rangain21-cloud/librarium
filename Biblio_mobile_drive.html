@@ -1276,6 +1276,14 @@
             padding: 0.5rem 0.5rem;
         }
 
+        /* Modale "Ouvrages sélectionnés" : cellules complètes, sans troncature */
+        #resultTable td {
+            white-space: nowrap;
+            overflow: visible;
+            text-overflow: clip;
+            max-width: none;
+        }
+
         tbody tr:hover {
             background-color: #f9f9f9;
         }
@@ -4130,7 +4138,7 @@ function populateDatalist(datalistId, options) {
                 const bookInfo = appState.booksData.find(b => (b.Titre || "").trim().toLowerCase() === (loan.Titre || "").trim().toLowerCase()) || {};
                 
                 const remarks = (bookInfo.Remarques || "");
-                const truncatedRemarks = remarks.length > 30 ? remarks.substring(0, 30) + '...' : remarks;
+                const truncatedRemarks = remarks; // affichage complet dans la modale
 
                 tr.innerHTML = `
                     <td>${loan.DateEmprunt || ''}</td>

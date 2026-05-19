@@ -1541,6 +1541,73 @@
             color: var(--text-color);
         }
 
+        /* ── Réduction taille : modales Bibliothèque + Ouvrages sélectionnés ── */
+        #bookModal .modal-header h2,
+        #resultModal .modal-header h2 {
+            font-size: 1.05rem;
+        }
+
+        #bookModal .close-btn,
+        #resultModal .close-btn {
+            font-size: 1.1rem;
+        }
+
+        #bookModal .modal-header,
+        #resultModal .modal-header {
+            margin-bottom: 0.3rem;
+            padding-bottom: 0.2rem;
+        }
+
+        /* Formulaire Bibliothèque : labels + champs */
+        #bookModal .form-field label,
+        #bookForm .form-field label {
+            font-size: 0.75rem;
+        }
+
+        #bookModal .form-field input,
+        #bookModal .form-field select,
+        #bookModal .form-field textarea,
+        #bookForm .form-field input,
+        #bookForm .form-field select,
+        #bookForm .form-field textarea {
+            padding: 0.25rem 0.4rem;
+            font-size: 0.78rem;
+        }
+
+        #bookModal .form-group {
+            gap: 0.5rem;
+            margin-bottom: 0.15rem;
+        }
+
+        #bookModal .form-field textarea {
+            min-height: 52px;
+        }
+
+        /* Footer des deux modales */
+        #bookModal .modal-footer,
+        #resultModal .modal-footer {
+            gap: 0.6rem;
+            margin-top: 0.8rem;
+            padding-top: 0.6rem;
+        }
+
+        #bookModal .modal-footer button,
+        #resultModal .modal-footer button {
+            padding: 0.35rem 0.8rem;
+            font-size: 0.78rem;
+        }
+
+        /* En-têtes du tableau Ouvrages sélectionnés */
+        #resultTable th {
+            font-size: 0.78rem;
+            padding: 0.35rem 0.5rem;
+        }
+
+        #resultTable td {
+            font-size: 0.78rem;
+            padding: 0.3rem 0.5rem;
+        }
+
         .btn-cancel:hover {
             background-color: #95a5a6;
         }

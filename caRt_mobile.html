@@ -1090,16 +1090,15 @@ function updateExportBtn() {
 }
 
 // ── CSV EXPORT ──────────────────────────────────────
-function exportCsv() {
-    if (!csvData) return;
+// ── CONSTRUCTION DU CONTENU CSV (partagée) ──────────
+function buildCsvContent() {
     const headers = ['IdLot', 'IdProprio', 'Image', 'Famille', 'Lieu-dit', 'Cadrage', 'Texte', 'Picture'];
     const rows = csvData.map(r => {
         const nr = {};
         headers.forEach(h => { nr[h] = (h === 'Texte' || h === 'Picture') ? '' : (r[h] || ''); });
         if (commentsData[r.IdLot]) {
-            if (commentsData[r.IdLot].text) {
+            if (commentsData[r.IdLot].text)
                 nr.Texte = commentsData[r.IdLot].text.replace(/"/g, '""').replace(/[\r\n]+/g, ' ');
-            }
             if (commentsData[r.IdLot].picture) nr.Picture = commentsData[r.IdLot].picture;
         }
         return nr;
@@ -1112,14 +1111,40 @@ function exportCsv() {
             return v;
         }).join(',') + '\n';
     });
+    return csv;
+}
+
+// ── EXPORT CSV : local + Drive si connecté ───────────
+async function exportCsv() {
+    if (!csvData) return;
+    const csv      = buildCsvContent();
+    const fileName = originalCsvFileName || 'legende.csv';
+
+    // Téléchargement local (toujours)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = originalCsvFileName || 'legende.csv';
+    const a    = document.createElement('a');
+    a.href     = URL.createObjectURL(blob);
+    a.download = fileName;
     a.click();
     hasUnsaved = false;
     updateExportBtn();
     toast('Fichier CSV téléchargé ✓');
+
+    // Sauvegarde sur Drive en plus, si connecté
+    if (driveToken) {
+        try {
+            const folderId = await getOrCreateFolder(DRIVE_FOLDER);
+            if (driveFileIds.csv) {
+                await updateDriveFile(driveFileIds.csv, csv, 'text/csv');
+            } else {
+                driveFileIds.csv = await createDriveFile(folderId, fileName, csv, 'text/csv');
+            }
+            toast(`CSV aussi sauvegardé sur Drive ✓ (${DRIVE_FOLDER}/${fileName})`);
+            setDriveStatus(`✓ CSV mis à jour dans "${DRIVE_FOLDER}"`, 'connected');
+        } catch(e) {
+            toast('Drive (non bloquant) : ' + e.message);
+        }
+    }
 }
 
 // ── HIGHLIGHTS ──────────────────────────────────────
@@ -1414,34 +1439,20 @@ async function driveLoad() {
 
 async function driveSave() {
     if (!driveToken) { toast('Non connecté'); return; }
-    if (!csvData) { toast('Aucune légende à sauvegarder'); return; }
-    setDriveStatus('Sauvegarde en cours…');
+    if (!csvData)    { toast('Aucune légende à sauvegarder'); return; }
+    setDriveStatus(`Sauvegarde dans "${DRIVE_FOLDER}"…`);
     try {
-        const folderId = await getOrCreateFolder(DRIVE_FOLDER);
-        // Build CSV content
-        const headers = ['IdLot', 'IdProprio', 'Image', 'Famille', 'Lieu-dit', 'Cadrage', 'Texte', 'Picture'];
-        const rows = csvData.map(r => {
-            const nr = {};
-            headers.forEach(h => { nr[h] = (h==='Texte'||h==='Picture') ? '' : (r[h]||''); });
-            if (commentsData[r.IdLot]) {
-                if (commentsData[r.IdLot].text) nr.Texte = commentsData[r.IdLot].text.replace(/"/g,'""').replace(/[\r\n]+/g,' ');
-                if (commentsData[r.IdLot].picture) nr.Picture = commentsData[r.IdLot].picture;
-            }
-            return nr;
-        });
-        let csvContent = '\uFEFF' + headers.join(',') + '\n';
-        rows.forEach(r => { csvContent += headers.map(h => { let v=r[h]||''; if(v.includes(',')||v.includes('"')||v.includes('\n'))v='"'+v+'"'; return v; }).join(',') + '\n'; });
-
+        const csv      = buildCsvContent();
         const fileName = originalCsvFileName || 'legende.csv';
+        const folderId = await getOrCreateFolder(DRIVE_FOLDER);
         if (driveFileIds.csv) {
-            await updateDriveFile(driveFileIds.csv, csvContent, 'text/csv');
+            await updateDriveFile(driveFileIds.csv, csv, 'text/csv');
         } else {
-            const id = await createDriveFile(folderId, fileName, csvContent, 'text/csv');
-            driveFileIds.csv = id;
+            driveFileIds.csv = await createDriveFile(folderId, fileName, csv, 'text/csv');
         }
         hasUnsaved = false; updateExportBtn();
-        setDriveStatus('Sauvegardé sur Drive ✓', 'connected');
-        toast('Fichier CSV sauvegardé sur Drive ✓');
+        setDriveStatus(`✓ "${DRIVE_FOLDER}/${fileName}" sauvegardé`, 'connected');
+        toast('CSV sauvegardé sur Drive ✓');
     } catch(e) {
         setDriveStatus('Erreur : ' + e.message, 'error');
         toast('Erreur sauvegarde : ' + e.message);

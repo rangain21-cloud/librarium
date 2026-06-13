@@ -477,6 +477,7 @@
             </div>
             <div class="section-body">
                 <div id="driveStatus">Non connecté</div>
+                <div id="driveLog" style="font-size:0.72rem;color:var(--text-muted);background:var(--bg-dark);border-radius:6px;padding:6px 8px;margin-bottom:8px;max-height:80px;overflow-y:auto;display:none;font-family:monospace;line-height:1.5;white-space:pre-wrap"></div>
                 <div class="drive-btns">
                     <button class="btn btn-primary" onclick="driveConnect()">🔗 Connecter</button>
                     <button class="btn btn-muted" id="btnDriveLoad" onclick="driveLoad()" disabled>⬇ Charger depuis Drive</button>
@@ -1133,21 +1134,31 @@ async function exportCsv() {
 
     // Sauvegarde sur Drive en plus, si connecté
     if (driveToken) {
+        driveLog('Export CSV → Drive démarré…');
         try {
+            driveLog('  getOrCreateFolder(' + DRIVE_FOLDER + ')…');
             const folderId = await getOrCreateFolder(DRIVE_FOLDER);
+            driveLog('  folderId=' + folderId);
             if (driveFileIds.csv) {
+                driveLog('  updateDriveFile(' + driveFileIds.csv + ')…');
                 await updateDriveFile(driveFileIds.csv, csv, 'text/csv');
+                driveLog('  ✓ mise à jour OK');
             } else {
+                driveLog('  createDriveFile(' + fileName + ')…');
                 driveFileIds.csv = await createDriveFile(folderId, fileName, csv, 'text/csv');
+                driveLog('  ✓ créé id=' + driveFileIds.csv);
             }
-            // Toast de succès Drive seulement ici, après upload confirmé
             toast(`✓ Drive : ${DRIVE_FOLDER}/${fileName} sauvegardé`);
             setDriveStatus(`✓ CSV mis à jour dans "${DRIVE_FOLDER}"`, 'connected');
         } catch(e) {
             console.error('Drive upload error:', e);
+            driveLog('  ✗ ERREUR : ' + e.message);
             setDriveStatus(`Erreur upload Drive : ${e.message}`, 'error');
             toast(`⚠ Drive KO : ${e.message}`, 5000);
         }
+    } else {
+        driveLog('Export CSV : driveToken absent, sauvegarde Drive ignorée');
+        setDriveStatus('⚠ Non connecté – sauvegarde locale uniquement', 'error');
     }
 }
 
@@ -1366,25 +1377,30 @@ function checkDriveCallback() {
         const expires = Date.now() + (parseInt(p.get('expires_in') || '3600') - 60) * 1000;
         driveToken = token;
         try {
-            sessionStorage.setItem('cartum_tok', token);
-            sessionStorage.setItem('cartum_exp', expires);
-        } catch(e) {}
-        // Clean URL without triggering a reload
+            // localStorage persiste entre sessions (survit aux mises en veille Android)
+            localStorage.setItem('cartum_tok', token);
+            localStorage.setItem('cartum_exp', String(expires));
+        } catch(e) { driveLog('⚠ localStorage indisponible : ' + e.message); }
         history.replaceState(null, '', location.pathname + location.search);
+        driveLog('✓ Token OAuth reçu, expire dans ' + Math.round((expires - Date.now()) / 60000) + ' min');
         _driveConnected();
-        // Re-expand Drive section after OAuth redirect
         setTimeout(() => { expandSec('sec-drive'); }, 300);
         return;
     }
-    // Case 2 – page reload or navigation: restore token from sessionStorage
+    // Case 2 – restore token from localStorage
     try {
-        const tok = sessionStorage.getItem('cartum_tok');
-        const exp = parseInt(sessionStorage.getItem('cartum_exp') || '0');
+        const tok = localStorage.getItem('cartum_tok');
+        const exp = parseInt(localStorage.getItem('cartum_exp') || '0');
         if (tok && Date.now() < exp) {
             driveToken = tok;
+            driveLog('✓ Token restauré depuis localStorage, expire dans ' + Math.round((exp - Date.now()) / 60000) + ' min');
             _driveConnected();
+        } else if (tok) {
+            driveLog('⚠ Token expiré – reconnecter');
+            localStorage.removeItem('cartum_tok');
+            localStorage.removeItem('cartum_exp');
         }
-    } catch(e) {}
+    } catch(e) { driveLog('⚠ Restore token : ' + e.message); }
 }
 
 function _driveConnected() {
@@ -1392,6 +1408,16 @@ function _driveConnected() {
     document.getElementById('btnDriveLoad').disabled = false;
     document.getElementById('btnDriveSave').disabled = false;
     toast('Google Drive connecté ✓');
+}
+
+function driveLog(msg) {
+    const el = document.getElementById('driveLog');
+    if (!el) return;
+    el.style.display = 'block';
+    const ts = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    el.textContent = (el.textContent ? el.textContent + '\n' : '') + ts + ' ' + msg;
+    el.scrollTop = el.scrollHeight;
+    console.log('[Drive]', msg);
 }
 
 function setDriveStatus(msg, cls) {
@@ -1442,37 +1468,57 @@ async function driveLoad() {
 }
 
 async function driveSave() {
-    if (!driveToken) { toast('Non connecté'); return; }
-    if (!csvData)    { toast('Aucune légende à sauvegarder'); return; }
+    if (!driveToken) {
+        driveLog('driveSave : driveToken absent – non connecté');
+        toast('Non connecté à Drive'); return;
+    }
+    if (!csvData) { toast('Aucune légende à sauvegarder'); return; }
     setDriveStatus(`Sauvegarde dans "${DRIVE_FOLDER}"…`);
+    driveLog('driveSave démarré…');
     try {
         const csv      = buildCsvContent();
         const fileName = originalCsvFileName || 'legende.csv';
+        driveLog('  getOrCreateFolder(' + DRIVE_FOLDER + ')…');
         const folderId = await getOrCreateFolder(DRIVE_FOLDER);
+        driveLog('  folderId=' + folderId);
         if (driveFileIds.csv) {
+            driveLog('  updateDriveFile(' + driveFileIds.csv + ')…');
             await updateDriveFile(driveFileIds.csv, csv, 'text/csv');
+            driveLog('  ✓ mise à jour OK');
         } else {
+            driveLog('  createDriveFile(' + fileName + ')…');
             driveFileIds.csv = await createDriveFile(folderId, fileName, csv, 'text/csv');
+            driveLog('  ✓ créé id=' + driveFileIds.csv);
         }
         hasUnsaved = false; updateExportBtn();
         setDriveStatus(`✓ "${DRIVE_FOLDER}/${fileName}" sauvegardé`, 'connected');
         toast('CSV sauvegardé sur Drive ✓');
     } catch(e) {
+        driveLog('  ✗ ERREUR : ' + e.message);
         setDriveStatus('Erreur : ' + e.message, 'error');
         toast('Erreur sauvegarde : ' + e.message);
     }
 }
 
 async function driveTest() {
-    if (!driveToken) { toast('Non connecté à Drive'); return; }
+    if (!driveToken) {
+        driveLog('TEST : driveToken est NULL');
+        toast('Non connecté à Drive'); return;
+    }
+    driveLog('TEST : token présent, appel /about…');
     try {
-        const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=user', {
+        const r = await fetch('https://www.googleapis.com/drive/v3/about?fields=user,storageQuota', {
             headers: { Authorization: 'Bearer ' + driveToken }
         });
         const d = await r.json();
-        toast(`Drive OK – ${d.user?.displayName || 'connecté'}`);
-        setDriveStatus(`Connecté : ${d.user?.emailAddress || 'OK'}`, 'connected');
+        if (!r.ok) throw new Error(`${r.status} ${d?.error?.message}`);
+        const exp = parseInt(localStorage.getItem('cartum_exp') || '0');
+        const minLeft = Math.round((exp - Date.now()) / 60000);
+        driveLog(`✓ Connecté : ${d.user?.emailAddress || '?'} – expire dans ${minLeft} min`);
+        toast(`Drive OK – ${d.user?.displayName || 'connecté'} (${minLeft} min restantes)`);
+        setDriveStatus(`Connecté : ${d.user?.emailAddress || 'OK'} (${minLeft} min)`, 'connected');
     } catch(e) {
+        driveLog('✗ TEST KO : ' + e.message);
         toast('Erreur TEST : ' + e.message);
         setDriveStatus('Erreur TEST Drive', 'error');
     }

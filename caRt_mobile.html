@@ -642,9 +642,10 @@ let activeFilterProprio = null;
 let driveToken = null;
 let driveFileIds = { svg: null, csv: null };
 const DRIVE_CLIENT_ID = '270579218887-5jp1phjocqcik0pgbjtlit3n20on0de6.apps.googleusercontent.com'; // à remplir dans GitHub Pages
-// drive.readonly = lire tous les fichiers (scope restreint, pas de vérification Google requise)
-// drive.file     = créer/modifier les fichiers créés par cette appli
-const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/drive.file';
+// drive = accès complet (lecture + écriture + création de dossiers)
+// Nécessite vérification Google pour publication publique,
+// mais fonctionne immédiatement pour les comptes testeurs déclarés dans la console.
+const DRIVE_SCOPE = 'https://www.googleapis.com/auth/drive';
 const DRIVE_FOLDER = 'Cartum';
 
 // pending confirm callback
@@ -1139,10 +1140,13 @@ async function exportCsv() {
             } else {
                 driveFileIds.csv = await createDriveFile(folderId, fileName, csv, 'text/csv');
             }
-            toast(`CSV aussi sauvegardé sur Drive ✓ (${DRIVE_FOLDER}/${fileName})`);
+            // Toast de succès Drive seulement ici, après upload confirmé
+            toast(`✓ Drive : ${DRIVE_FOLDER}/${fileName} sauvegardé`);
             setDriveStatus(`✓ CSV mis à jour dans "${DRIVE_FOLDER}"`, 'connected');
         } catch(e) {
-            toast('Drive (non bloquant) : ' + e.message);
+            console.error('Drive upload error:', e);
+            setDriveStatus(`Erreur upload Drive : ${e.message}`, 'error');
+            toast(`⚠ Drive KO : ${e.message}`, 5000);
         }
     }
 }
@@ -1506,15 +1510,20 @@ async function getOrCreateFolder(name) {
     const r = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
         headers: { Authorization: 'Bearer ' + driveToken }
     });
+    if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(`getFolder ${r.status}: ${d?.error?.message || r.statusText}`);
+    }
     const d = await r.json();
     if (d.files && d.files.length > 0) return d.files[0].id;
-    // create
+    // Créer le dossier
     const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + driveToken, 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder' })
     });
     const cd = await cr.json();
+    if (!cr.ok) throw new Error(`createFolder ${cr.status}: ${cd?.error?.message || cr.statusText}`);
     return cd.id;
 }
 
@@ -1548,15 +1557,20 @@ async function createDriveFile(folderId, name, content, mime) {
         body: form
     });
     const d = await r.json();
+    if (!r.ok) throw new Error(`createDriveFile ${r.status}: ${d?.error?.message || r.statusText}`);
     return d.id;
 }
 
 async function updateDriveFile(fileId, content, mime) {
-    await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
+    const r = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=media`, {
         method: 'PATCH',
         headers: { Authorization: 'Bearer ' + driveToken, 'Content-Type': mime },
         body: content
     });
+    if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        throw new Error(`updateDriveFile ${r.status}: ${d?.error?.message || r.statusText}`);
+    }
 }
 
 // ── IMAGE MODAL ──────────────────────────────────────

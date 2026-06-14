@@ -1404,6 +1404,7 @@ function checkDriveCallback() {
 }
 
 function _driveConnected() {
+    _cachedFolderId = null; // reset cache dossier à chaque nouvelle connexion
     setDriveStatus('Connecté à Google Drive ✓', 'connected');
     document.getElementById('btnDriveLoad').disabled = false;
     document.getElementById('btnDriveSave').disabled = false;
@@ -1559,10 +1560,21 @@ async function searchDriveByType(ext) {
     return (d.files || []).filter(f => f.name.toLowerCase().endsWith(ext));
 }
 
+// Mémoïsation du folderId pour éviter des appels répétés
+let _cachedFolderId = null;
+
 async function getOrCreateFolder(name) {
+    // Retourner le cache si disponible
+    if (_cachedFolderId) {
+        driveLog(`  getOrCreateFolder("${name}") : cache → id=${_cachedFolderId}`);
+        return _cachedFolderId;
+    }
+    // Chercher le dossier dans My Drive (corpora=user, spaces=drive)
     const params = new URLSearchParams({
         q: `name = '${name}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
-        fields: 'files(id,name)'
+        corpora: 'user',
+        spaces: 'drive',
+        fields: 'files(id,name,parents)'
     });
     const r = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
         headers: { Authorization: 'Bearer ' + driveToken }
@@ -1572,8 +1584,14 @@ async function getOrCreateFolder(name) {
         throw new Error(`getFolder ${r.status}: ${d?.error?.message || r.statusText}`);
     }
     const d = await r.json();
-    if (d.files && d.files.length > 0) return d.files[0].id;
-    // Créer le dossier
+    driveLog(`  getOrCreateFolder("${name}") : ${d.files?.length || 0} dossier(s) trouvé(s)`);
+    if (d.files && d.files.length > 0) {
+        driveLog(`  → utilise dossier existant id=${d.files[0].id}`);
+        _cachedFolderId = d.files[0].id;
+        return _cachedFolderId;
+    }
+    // Créer le dossier dans My Drive (racine)
+    driveLog(`  → dossier "${name}" absent, création…`);
     const cr = await fetch('https://www.googleapis.com/drive/v3/files', {
         method: 'POST',
         headers: { Authorization: 'Bearer ' + driveToken, 'Content-Type': 'application/json' },
@@ -1581,7 +1599,9 @@ async function getOrCreateFolder(name) {
     });
     const cd = await cr.json();
     if (!cr.ok) throw new Error(`createFolder ${cr.status}: ${cd?.error?.message || cr.statusText}`);
-    return cd.id;
+    driveLog(`  → dossier "${name}" créé id=${cd.id}`);
+    _cachedFolderId = cd.id;
+    return _cachedFolderId;
 }
 
 async function listDriveFiles(folderId) {

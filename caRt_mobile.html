@@ -1300,6 +1300,16 @@ function resetFilter() {
     currentIdLot = null;
     updateHeader('');
     updateCommentDisplay();
+    // Réinitialiser la vue carte (position + zoom)
+    resetMapView();
+}
+
+function resetMapView() {
+    if (!svgWrapper) return;
+    xform = { x: 0, y: 0, scale: 1 };
+    svgWrapper.style.transition = 'transform 0.4s cubic-bezier(0.4,0,0.2,1)';
+    applyXform();
+    setTimeout(() => { svgWrapper.style.transition = ''; }, 420);
 }
 
 function searchLot() {

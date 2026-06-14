@@ -1432,22 +1432,72 @@ async function driveLoad() {
         driveLog('driveLoad : driveToken absent');
         toast('Non connecté'); return;
     }
-    setDriveStatus(`Recherche du dossier "${DRIVE_FOLDER}"…`);
-    driveLog(`driveLoad démarré – recherche dossier "${DRIVE_FOLDER}"…`);
+    setDriveStatus('Recherche dans Drive…');
+    driveLog(`driveLoad – recherche tous les dossiers "${DRIVE_FOLDER}"…`);
     try {
-        // 1. Trouver (ou créer) le dossier Cartum
-        const folderId = await getOrCreateFolder(DRIVE_FOLDER);
-        driveLog(`  folderId=${folderId}`);
-        setDriveStatus(`Dossier "${DRIVE_FOLDER}" trouvé – lecture des fichiers…`);
 
-        // 2. Lister UNIQUEMENT les fichiers directs dans ce dossier
-        const files = await listDriveFiles(folderId);
-        driveLog(`  ${files.length} fichier(s) dans "${DRIVE_FOLDER}" : ${files.map(f => f.name).join(', ') || 'aucun'}`);
+        // ── Étape 1 : trouver TOUS les dossiers nommés DRIVE_FOLDER ──
+        const folderParams = new URLSearchParams({
+            q: `name = '${DRIVE_FOLDER}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`,
+            corpora: 'user', spaces: 'drive',
+            fields: 'files(id,name)',
+            pageSize: '20'
+        });
+        const folderR = await fetch(`https://www.googleapis.com/drive/v3/files?${folderParams}`, {
+            headers: { Authorization: 'Bearer ' + driveToken }
+        });
+        const folderD = await folderR.json();
+        const folders = folderD.files || [];
+        driveLog(`  ${folders.length} dossier(s) "${DRIVE_FOLDER}" : ${folders.map(f=>f.id).join(' | ') || 'aucun'}`);
 
-        const svgFile = files.find(f => f.name.toLowerCase().endsWith('.svg')) || null;
-        const csvFile = files.find(f => f.name.toLowerCase().endsWith('.csv')) || null;
-        driveLog(`  SVG: ${svgFile ? svgFile.name : '✗ non trouvé'}  CSV: ${csvFile ? csvFile.name : '✗ non trouvé'}`);
+        if (folders.length === 0) {
+            setDriveStatus(`Dossier "${DRIVE_FOLDER}" introuvable`, 'error');
+            driveLog(`  ✗ Créez un dossier "${DRIVE_FOLDER}" sur Drive avec vos fichiers`);
+            toast(`Dossier "${DRIVE_FOLDER}" introuvable`);
+            return;
+        }
 
+        // ── Étape 2 : inspecter le contenu de chaque dossier ──────
+        let svgFile = null, csvFile = null, realFolderId = null;
+
+        for (const folder of folders) {
+            const listParams = new URLSearchParams({
+                q: `'${folder.id}' in parents and mimeType != 'application/vnd.google-apps.folder' and trashed = false`,
+                fields: 'files(id,name)',
+                pageSize: '50'
+            });
+            const listR = await fetch(`https://www.googleapis.com/drive/v3/files?${listParams}`, {
+                headers: { Authorization: 'Bearer ' + driveToken }
+            });
+            const listD = await listR.json();
+            const files = listD.files || [];
+            driveLog(`  Dossier id=${folder.id} → ${files.length} fichier(s) : ${files.map(f=>f.name).join(', ') || 'vide'}`);
+
+            const svg = files.find(f => f.name.toLowerCase().endsWith('.svg')) || null;
+            const csv = files.find(f => f.name.toLowerCase().endsWith('.csv')) || null;
+
+            // Priorité : dossier contenant les DEUX fichiers
+            if (svg && csv) {
+                svgFile = svg; csvFile = csv; realFolderId = folder.id;
+                driveLog(`  ✓ Dossier retenu (SVG+CSV) id=${folder.id}`);
+                break;
+            }
+            // Sinon mémoriser en réserve (premier dossier avec au moins un fichier)
+            if ((svg || csv) && !realFolderId) {
+                if (svg) svgFile = svg;
+                if (csv) csvFile = csv;
+                realFolderId = folder.id;
+                driveLog(`  ⚠ Dossier partiel (SVG:${!!svg} CSV:${!!csv}) id=${folder.id}`);
+            }
+        }
+
+        // Mémoriser pour les sauvegardes futures
+        if (realFolderId) {
+            _cachedFolderId = realFolderId;
+            driveLog(`  folderId mémorisé : ${realFolderId}`);
+        }
+
+        // ── Étape 3 : télécharger ─────────────────────────────────
         if (svgFile) {
             driveLog(`  Téléchargement SVG "${svgFile.name}"…`);
             const text = await downloadDriveFile(svgFile.id);
@@ -1465,12 +1515,13 @@ async function driveLoad() {
             toast(`CSV chargé : ${csvFile.name}`);
         }
         if (!svgFile && !csvFile) {
-            setDriveStatus(`Aucun .svg/.csv dans "${DRIVE_FOLDER}"`, 'error');
-            driveLog(`  ✗ Aucun fichier .svg ou .csv dans "${DRIVE_FOLDER}"`);
+            setDriveStatus(`Aucun .svg/.csv dans les dossiers "${DRIVE_FOLDER}"`, 'error');
+            driveLog(`  ✗ Aucun .svg/.csv dans aucun dossier "${DRIVE_FOLDER}"`);
             toast(`Aucun fichier dans "${DRIVE_FOLDER}"`);
         } else {
             setDriveStatus(`✓ ${svgFile ? svgFile.name : '—'} / ${csvFile ? csvFile.name : '—'}`, 'connected');
         }
+
     } catch(e) {
         driveLog(`  ✗ ERREUR : ${e.message}`);
         setDriveStatus('Erreur : ' + e.message, 'error');
@@ -1478,6 +1529,7 @@ async function driveLoad() {
         console.error('driveLoad error', e);
     }
 }
+
 
 async function driveSave() {
     if (!driveToken) {

@@ -5087,6 +5087,16 @@ function populateDatalist(datalistId, options) {
         drawerContent.appendChild(buildTextInput('filterTitle', 'Mot clé du titre', null));
         drawerContent.appendChild(buildTextInput('filterRemarks', 'Remarques', 'remarksList'));
 
+        /* ── Bouton Nouvel ouvrage ── */
+        const newBookBtn = document.createElement('button');
+        newBookBtn.textContent = 'Nouvel ouvrage';
+        newBookBtn.style.cssText = 'width:100%;margin-top:0.5rem;padding:0.65rem;background:#27ae60;color:white;border:none;border-radius:8px;font-size:0.95rem;font-weight:600;cursor:pointer;min-height:44px;';
+        newBookBtn.addEventListener('click', function() {
+            closeFilterDrawer();
+            document.getElementById('btnNewBook').click();
+        });
+        drawerContent.appendChild(newBookBtn);
+
         /* ── Bouton Effacer les filtres ── */
         const clearBtn = document.createElement('button');
         clearBtn.textContent = 'Effacer les filtres';

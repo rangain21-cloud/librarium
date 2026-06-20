@@ -2094,6 +2094,52 @@
                 min-height: 44px; /* Taille tactile recommandée */
             }
         }
+
+        /* ── Combobox tactile personnalisée (remplace le datalist natif,
+               peu fiable sous Android dans une modale à scroll interne) ── */
+        .mc-dropdown {
+            position: fixed;
+            z-index: 5000;
+            background: #fff;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+            max-height: 45vh;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+            display: none;
+        }
+
+        .mc-dropdown.mc-open {
+            display: block;
+        }
+
+        .mc-dropdown-item {
+            padding: 0.65rem 0.75rem;
+            font-size: 0.95rem;
+            min-height: 44px;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            cursor: pointer;
+            border-bottom: 1px solid #eee;
+        }
+
+        .mc-dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .mc-dropdown-item:active,
+        .mc-dropdown-item.mc-active {
+            background-color: #eaf4fc;
+        }
+
+        .mc-dropdown-empty {
+            padding: 0.65rem 0.75rem;
+            font-size: 0.85rem;
+            color: #888;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -3405,6 +3451,121 @@ function populateDatalist(datalistId, options) {
         document.getElementById('bookPrice').addEventListener('focus', function() {
             this.value = this.value.replace(/[^\d.,]/g, '');
         });
+
+        // ── Combobox tactile (Android / mobile) ──────────────────────────
+        // Le couple <input list> + <datalist> natif est peu fiable sous
+        // Android lorsqu'il est placé dans une modale à scroll interne :
+        // liste coupée, mal positionnée, ou qui n'apparaît pas. Sur PC le
+        // comportement natif est correct, on ne le modifie donc pas : la
+        // bascule se fait uniquement sur écran tactile / mobile.
+        const MC_IS_TOUCH = window.matchMedia('(max-width: 768px), (pointer: coarse) and (hover: none)').matches;
+
+        function setupMobileCombo(inputId) {
+            const input = document.getElementById(inputId);
+            if (!input || !MC_IS_TOUCH) return;
+
+            const datalistId = input.getAttribute('list');
+            const datalist = datalistId ? document.getElementById(datalistId) : null;
+            if (!datalist) return;
+
+            // On désactive le datalist natif pour ce champ et on prend la
+            // main avec une liste déroulante maison.
+            input.removeAttribute('list');
+            input.setAttribute('autocomplete', 'off');
+
+            const dropdown = document.createElement('div');
+            dropdown.className = 'mc-dropdown';
+            document.body.appendChild(dropdown);
+
+            function getOptions() {
+                // Lues à chaque ouverture : reste à jour même si la
+                // datalist est repeuplée dynamiquement (populateDatalist).
+                return Array.from(datalist.options).map(o => o.value).filter(Boolean);
+            }
+
+            function positionDropdown() {
+                const r = input.getBoundingClientRect();
+                dropdown.style.left = r.left + 'px';
+                dropdown.style.width = r.width + 'px';
+                const spaceBelow = window.innerHeight - r.bottom;
+                if (spaceBelow < 150 && r.top > spaceBelow) {
+                    // Pas assez de place en dessous (clavier visible, etc.) : on ouvre au-dessus.
+                    dropdown.style.top = '';
+                    dropdown.style.bottom = (window.innerHeight - r.top) + 'px';
+                } else {
+                    dropdown.style.bottom = '';
+                    dropdown.style.top = r.bottom + 'px';
+                }
+            }
+
+            function renderList(filterValue) {
+                const term = (filterValue || '').trim().toLowerCase();
+                const all = getOptions();
+                const matches = term ? all.filter(v => v.toLowerCase().includes(term)) : all;
+                dropdown.innerHTML = '';
+                if (matches.length === 0) {
+                    const empty = document.createElement('div');
+                    empty.className = 'mc-dropdown-empty';
+                    empty.textContent = 'Aucune suggestion — valeur libre';
+                    dropdown.appendChild(empty);
+                    return;
+                }
+                matches.slice(0, 100).forEach(function(val) {
+                    const item = document.createElement('div');
+                    item.className = 'mc-dropdown-item';
+                    item.textContent = val;
+                    // Empêche le blur du champ de se déclencher avant le clic sur l'option
+                    item.addEventListener('mousedown', function(e) { e.preventDefault(); });
+                    item.addEventListener('click', function() {
+                        input.value = val;
+                        closeDropdown();
+                        // Évènements indispensables : le reste du code (ex. recherche
+                        // d'auteur) écoute 'input'/'change' pour réagir à la sélection.
+                        input.dispatchEvent(new Event('input', { bubbles: true }));
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    });
+                    dropdown.appendChild(item);
+                });
+            }
+
+            function openDropdown() {
+                renderList(input.value);
+                positionDropdown();
+                dropdown.classList.add('mc-open');
+            }
+
+            function closeDropdown() {
+                dropdown.classList.remove('mc-open');
+            }
+
+            input.addEventListener('focus', openDropdown);
+            input.addEventListener('input', function() {
+                renderList(input.value);
+                positionDropdown();
+                dropdown.classList.add('mc-open');
+            });
+            input.addEventListener('blur', function() {
+                // Laisse le temps au clic sur une option de s'exécuter avant de fermer
+                setTimeout(closeDropdown, 150);
+            });
+            window.addEventListener('scroll', function() {
+                if (dropdown.classList.contains('mc-open')) positionDropdown();
+            }, true);
+            window.addEventListener('resize', function() {
+                if (dropdown.classList.contains('mc-open')) positionDropdown();
+            });
+            if (window.visualViewport) {
+                window.visualViewport.addEventListener('resize', function() {
+                    if (dropdown.classList.contains('mc-open')) positionDropdown();
+                });
+                window.visualViewport.addEventListener('scroll', function() {
+                    if (dropdown.classList.contains('mc-open')) positionDropdown();
+                });
+            }
+        }
+
+        // Champs de la modale "Entrée dans la bibliothèque" / "Modification d'ouvrage"
+        ['bookLike', 'searchAuthor', 'bookCase', 'bookPublisher', 'bookSupport'].forEach(setupMobileCombo);
 
         // Éditer un ouvrage
         function editBook(refLivre) {

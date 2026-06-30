@@ -4347,7 +4347,7 @@ function populateDatalist(datalistId, options) {
                 return true;
             });
 
-            // Trier par DateEmprunt croissante
+            // Trier par DateEmprunt décroissante (plus récente en premier)
             results.sort((a, b) => {
                 const parseDate = (dateStr) => {
                     if (!dateStr) return new Date(0);
@@ -4357,7 +4357,7 @@ function populateDatalist(datalistId, options) {
                     }
                     return new Date(dateStr);
                 };
-                return parseDate(a.DateEmprunt) - parseDate(b.DateEmprunt);
+                return parseDate(b.DateEmprunt) - parseDate(a.DateEmprunt);
             });
 
             // Stocker les résultats pour l'export

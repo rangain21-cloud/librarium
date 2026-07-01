@@ -3315,7 +3315,7 @@ function populateDatalist(datalistId, options) {
                 if (filters.author && !(book.Auteur || '').toLowerCase().includes(filters.author.toLowerCase())) return false;
                 if (filters.support && book.Support !== filters.support) return false;
                 if (filters.year && String(book.AnnéeCopyright) !== String(filters.year)) return false;
-                if (filters.title && !book.Titre.toLowerCase().includes(filters.title.toLowerCase())) return false;
+                if (filters.title && !(book.Titre || '').toLowerCase().includes(filters.title.toLowerCase())) return false;
                 if (filters.remarks) {
                     const bookRemarks = (book.Remarques || "").toLowerCase();
                     const searchRemarks = filters.remarks.toLowerCase();

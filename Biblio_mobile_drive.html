@@ -1687,6 +1687,9 @@
         }
 
         /* ── Burger menu ── */
+        .mobile-drive-buttons {
+            display: none;
+        }
         .burger-btn {
             display: none;
             background: none;
@@ -1793,6 +1796,26 @@
             letter-spacing: 0.08em;
             padding: 0 0.2rem;
         }
+        /* Sections pliables (Fichiers locaux / Google Drive) */
+        .burger-menu details.drive-section > summary.drive-section-label {
+            cursor: pointer;
+            list-style: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            user-select: none;
+        }
+        .burger-menu details.drive-section > summary.drive-section-label::-webkit-details-marker {
+            display: none;
+        }
+        .burger-menu details.drive-section > summary.drive-section-label::after {
+            content: '▾';
+            font-size: 0.85rem;
+            transition: transform 0.2s ease;
+        }
+        .burger-menu details.drive-section[open] > summary.drive-section-label::after {
+            transform: rotate(180deg);
+        }
         .burger-overlay {
             display: none;
             position: fixed;
@@ -1880,8 +1903,25 @@
             }
 
             /* Masquer tous les éléments du top-bar sauf le burger */
-            .top-bar > *:not(.burger-btn):not(.top-bar-title) {
+            .top-bar > *:not(.burger-btn):not(.top-bar-title):not(.mobile-drive-buttons) {
                 display: none !important;
+            }
+
+            .mobile-drive-buttons {
+                display: flex !important;
+                gap: 0.35rem;
+                align-items: center;
+            }
+
+            .mobile-drive-buttons button {
+                padding: 0.35rem 0.6rem !important;
+                font-size: 0.7rem !important;
+                border-radius: 6px;
+                border: none;
+                color: white;
+                font-weight: 600;
+                cursor: pointer;
+                white-space: nowrap;
             }
 
             .burger-btn {
@@ -2181,6 +2221,19 @@
         <button id="btnAuthors" class="btn-authors">Auteurs</button>
         <button id="btnVisualizations" class="btn-visualizations">Visualisations</button>
 
+        <!-- Boutons Drive dupliqués pour le bandeau mobile (Android) -->
+        <div class="mobile-drive-buttons">
+            <button id="mobileDriveConnectBtn" onclick="connectToDrive()" style="background:#7f8c8d;">
+                Connecter
+            </button>
+            <button id="mobileDriveLoadBtn" onclick="loadAllFromDrive()" disabled style="background:#7f8c8d;opacity:0.5;">
+                Charger
+            </button>
+            <button id="mobileDriveSaveBtn" onclick="saveAllToDrive()" disabled style="background:#7f8c8d;opacity:0.5;">
+                Sauver
+            </button>
+        </div>
+
         <!-- Burger button (visible on mobile only) -->
         <button class="burger-btn" id="burgerBtn" onclick="toggleBurgerMenu()" aria-label="Menu">
             <span></span><span></span><span></span>
@@ -2202,9 +2255,9 @@
             🔍 Filtres &amp; Actions
         </button>
 
-        <!-- Fichiers locaux -->
-        <div class="drive-section">
-            <div class="drive-section-label">📂 Fichiers locaux</div>
+        <!-- Fichiers locaux (pliable, replié par défaut) -->
+        <details class="drive-section">
+            <summary class="drive-section-label">📂 Fichiers locaux</summary>
             <label class="file-input-label" id="burgerLabelOuvrages" style="background:rgba(255,255,255,0.12);color:white;border:1px solid rgba(255,255,255,0.2);border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;cursor:pointer;box-sizing:border-box;">
                 📖 Ouvrages (.csv)
                 <input type="file" accept=".csv" onchange="document.getElementById('fileOuvrages').files = this.files; document.getElementById('fileOuvrages').dispatchEvent(new Event('change')); closeBurgerMenu();">
@@ -2217,11 +2270,11 @@
                 👤 Lecteurs (.csv)
                 <input type="file" accept=".csv" onchange="document.getElementById('fileLecteurs').files = this.files; document.getElementById('fileLecteurs').dispatchEvent(new Event('change')); closeBurgerMenu();">
             </label>
-        </div>
+        </details>
 
-        <!-- Google Drive -->
-        <div class="drive-section">
-            <div class="drive-section-label">☁️ Google Drive</div>
+        <!-- Google Drive (pliable, replié par défaut) -->
+        <details class="drive-section">
+            <summary class="drive-section-label">☁️ Google Drive</summary>
             <button id="burgerDriveConnectBtn" onclick="connectToDrive(); closeBurgerMenu();" style="background:#7f8c8d;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;">
                 Connecter
             </button>
@@ -2234,7 +2287,7 @@
             <button onclick="testDrive(); closeBurgerMenu();" style="background:#c0392b;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;">
                 🔍 Test Drive
             </button>
-        </div>
+        </details>
 
         <!-- Navigation -->
         <div class="drive-section">
@@ -5126,6 +5179,9 @@ function updateDriveButtons(connected) {
     const loadBtn = document.getElementById('driveLoadBtn');
     const saveBtn = document.getElementById('driveSaveBtn');
     const burgerConnectBtn = document.getElementById('burgerDriveConnectBtn');
+    const mobileConnectBtn = document.getElementById('mobileDriveConnectBtn');
+    const mobileLoadBtn = document.getElementById('mobileDriveLoadBtn');
+    const mobileSaveBtn = document.getElementById('mobileDriveSaveBtn');
     
     if (connectBtn) {
         if (connected) {
@@ -5137,18 +5193,21 @@ function updateDriveButtons(connected) {
         }
     }
 
-    if (burgerConnectBtn) {
+    [burgerConnectBtn, mobileConnectBtn].forEach(btn => {
+        if (!btn) return;
         if (connected) {
-            burgerConnectBtn.textContent = 'Connecté';
-            burgerConnectBtn.style.background = '#34a853';
+            btn.textContent = 'Connecté';
+            btn.style.background = '#34a853';
         } else {
-            burgerConnectBtn.textContent = 'Connecter';
-            burgerConnectBtn.style.background = '#7f8c8d';
+            btn.textContent = 'Connecter';
+            btn.style.background = '#7f8c8d';
         }
-    }
+    });
     
     if (loadBtn) loadBtn.disabled = !connected;
     if (saveBtn) saveBtn.disabled = !connected;
+    if (mobileLoadBtn) mobileLoadBtn.disabled = !connected;
+    if (mobileSaveBtn) mobileSaveBtn.disabled = !connected;
 }
 
 async function saveToGoogleDrive(fileName, content) {
@@ -5296,11 +5355,13 @@ async function loadAllFromDrive() {
         
         if (ouvragesContent || auteursContent || lecteursContent) {
             console.log('✓ Données chargées depuis Drive avec succès');
-            const burgerLoadBtn = document.getElementById('burgerDriveLoadBtn');
-            if (burgerLoadBtn) {
-                burgerLoadBtn.textContent = 'Chargé';
-                burgerLoadBtn.style.background = '#34a853';
-            }
+            ['burgerDriveLoadBtn', 'mobileDriveLoadBtn'].forEach(id => {
+                const btn = document.getElementById(id);
+                if (btn) {
+                    btn.textContent = 'Chargé';
+                    btn.style.background = '#34a853';
+                }
+            });
             alert('✓ Fichiers chargés depuis Drive avec succès !');
         } else {
             alert('⚠️ Aucun fichier trouvé sur Drive');
@@ -5343,11 +5404,13 @@ async function saveAllToDrive() {
         }
         
         console.log('✓ Tous les fichiers sauvegardés sur Drive');
-        const burgerSaveBtn = document.getElementById('burgerDriveSaveBtn');
-        if (burgerSaveBtn) {
-            burgerSaveBtn.textContent = 'Sauvé';
-            burgerSaveBtn.style.background = '#34a853';
-        }
+        ['burgerDriveSaveBtn', 'mobileDriveSaveBtn'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) {
+                btn.textContent = 'Sauvé';
+                btn.style.background = '#34a853';
+            }
+        });
         alert('✓ Fichiers sauvegardés sur Drive avec succès !');
         
     } catch (error) {
@@ -5694,6 +5757,8 @@ function testDrive() {
         const pairs = [
             ['driveLoadBtn', 'burgerDriveLoadBtn'],
             ['driveSaveBtn', 'burgerDriveSaveBtn'],
+            ['driveLoadBtn', 'mobileDriveLoadBtn'],
+            ['driveSaveBtn', 'mobileDriveSaveBtn'],
         ];
         pairs.forEach(([origId, burgerId]) => {
             const orig = document.getElementById(origId);
@@ -5723,6 +5788,7 @@ function testDrive() {
         // On observe ses mutations pour intercepter le clic au bon moment.
         const btn = document.getElementById('driveConnectBtn');
         const burgerBtn = document.getElementById('burgerDriveConnectBtn');
+        const mobileBtn = document.getElementById('mobileDriveConnectBtn');
         if (!btn) return;
 
         // Intercepte le clic : si le bouton est en mode "déconnecter", afficher la popup
@@ -5738,6 +5804,7 @@ function testDrive() {
 
         btn.addEventListener('click', guardClick, true);
         if (burgerBtn) burgerBtn.addEventListener('click', guardClick, true);
+        if (mobileBtn) mobileBtn.addEventListener('click', guardClick, true);
     }
 
     function showDisconnectConfirm() {

@@ -2146,7 +2146,7 @@
     <!-- Bandeau horizontal supérieur -->
     <div class="top-bar">
         <!-- Titre visible sur mobile -->
-        <span class="top-bar-title" style="color:white; font-weight:700; font-size:1.05rem; letter-spacing:0.01em;">📚 BiblioApp</span>
+        <span class="top-bar-title" style="color:white; font-weight:700; font-size:1.05rem; letter-spacing:0.01em;">📚 Copyract</span>
 
         <!-- Pavé "Charger les fichiers locaux" -->
         <div style="display:flex; align-items:center; gap:0.4rem; border:1px solid #bdc3c7; border-radius:8px; padding:0.3rem 0.6rem 0.3rem 0.5rem; background:#f4f6f7;">
@@ -2222,14 +2222,14 @@
         <!-- Google Drive -->
         <div class="drive-section">
             <div class="drive-section-label">☁️ Google Drive</div>
-            <button id="burgerDriveConnectBtn" onclick="connectToDrive(); closeBurgerMenu();" style="background:#4285f4;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;">
-                ☁️ Connecter à Drive
+            <button id="burgerDriveConnectBtn" onclick="connectToDrive(); closeBurgerMenu();" style="background:#7f8c8d;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;">
+                Connecter
             </button>
-            <button id="burgerDriveLoadBtn" onclick="loadAllFromDrive(); closeBurgerMenu();" disabled style="background:#34a853;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;opacity:0.5;">
-                ⬇️ Charger depuis Drive
+            <button id="burgerDriveLoadBtn" onclick="loadAllFromDrive(); closeBurgerMenu();" disabled style="background:#7f8c8d;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;opacity:0.5;">
+                Charger
             </button>
-            <button id="burgerDriveSaveBtn" onclick="saveAllToDrive(); closeBurgerMenu();" disabled style="background:#fbbc04;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;opacity:0.5;">
-                ⬆️ Sauver sur Drive
+            <button id="burgerDriveSaveBtn" onclick="saveAllToDrive(); closeBurgerMenu();" disabled style="background:#7f8c8d;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;opacity:0.5;">
+                Sauver
             </button>
             <button onclick="testDrive(); closeBurgerMenu();" style="background:#c0392b;color:white;border:none;border-radius:8px;padding:0.75rem 1rem;font-size:0.92rem;font-weight:600;cursor:pointer;text-align:left;">
                 🔍 Test Drive
@@ -5125,6 +5125,7 @@ function updateDriveButtons(connected) {
     const connectBtn = document.getElementById('driveConnectBtn');
     const loadBtn = document.getElementById('driveLoadBtn');
     const saveBtn = document.getElementById('driveSaveBtn');
+    const burgerConnectBtn = document.getElementById('burgerDriveConnectBtn');
     
     if (connectBtn) {
         if (connected) {
@@ -5133,6 +5134,16 @@ function updateDriveButtons(connected) {
         } else {
             connectBtn.textContent = '☁️ Connecter Drive';
             connectBtn.style.background = '#4285f4';
+        }
+    }
+
+    if (burgerConnectBtn) {
+        if (connected) {
+            burgerConnectBtn.textContent = 'Connecté';
+            burgerConnectBtn.style.background = '#34a853';
+        } else {
+            burgerConnectBtn.textContent = 'Connecter';
+            burgerConnectBtn.style.background = '#7f8c8d';
         }
     }
     
@@ -5285,6 +5296,11 @@ async function loadAllFromDrive() {
         
         if (ouvragesContent || auteursContent || lecteursContent) {
             console.log('✓ Données chargées depuis Drive avec succès');
+            const burgerLoadBtn = document.getElementById('burgerDriveLoadBtn');
+            if (burgerLoadBtn) {
+                burgerLoadBtn.textContent = 'Chargé';
+                burgerLoadBtn.style.background = '#34a853';
+            }
             alert('✓ Fichiers chargés depuis Drive avec succès !');
         } else {
             alert('⚠️ Aucun fichier trouvé sur Drive');
@@ -5327,6 +5343,11 @@ async function saveAllToDrive() {
         }
         
         console.log('✓ Tous les fichiers sauvegardés sur Drive');
+        const burgerSaveBtn = document.getElementById('burgerDriveSaveBtn');
+        if (burgerSaveBtn) {
+            burgerSaveBtn.textContent = 'Sauvé';
+            burgerSaveBtn.style.background = '#34a853';
+        }
         alert('✓ Fichiers sauvegardés sur Drive avec succès !');
         
     } catch (error) {

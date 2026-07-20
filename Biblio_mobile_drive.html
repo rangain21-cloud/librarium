@@ -3862,6 +3862,7 @@ function populateDatalist(datalistId, options) {
                 appState.readersData.push(readerData);
             }
 
+            updateReaderDatalists();
             renderBooksTable();
             closeReaderModal();
         });
@@ -4126,6 +4127,16 @@ function populateDatalist(datalistId, options) {
             // Vider les champs et rester sur le formulaire (sans pop-up ni fermeture)
             clearAuthorForm();
         });
+
+        function updateReaderDatalists() {
+            const firstNames = [...new Set(appState.readersData.map(r => r.PrénomLecteur).filter(Boolean))].sort();
+            const lastNames = [...new Set(appState.readersData.map(r => r.NomLecteur).filter(Boolean))].sort();
+            const addresses = [...new Set(appState.readersData.map(r => r.AdresseLecteur).filter(Boolean))].sort();
+
+            populateDatalist('readerFirstNameList', firstNames);
+            populateDatalist('readerLastNameList', lastNames);
+            populateDatalist('readerAddressList', addresses);
+        }
 
         function updateAuthorDatalists() {
             const firstNames = [...new Set(appState.authorsData.map(a => a.PrénomAuteur).filter(Boolean))].sort();

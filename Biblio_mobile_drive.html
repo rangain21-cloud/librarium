@@ -4760,23 +4760,6 @@ function populateDatalist(datalistId, options) {
             if (!table) return;
             const cols = table.querySelectorAll('th');
             
-            // Certaines tables (ex: #resultTable) utilisent table-layout: auto pour un
-            // affichage "largeur naturelle" au chargement. Dans ce mode, le navigateur
-            // recalcule la largeur des colonnes depuis leur contenu et ignore la largeur
-            // posée par le JS ci-dessous : le redimensionnement à la souris ne produit
-            // alors aucun effet visible. On fige donc le layout en 'fixed' dès que
-            // l'utilisateur commence à tirer une poignée, en capturant les largeurs
-            // actuelles de toutes les colonnes pour éviter tout saut visuel.
-            const freezeTableLayout = function() {
-                if (table.style.tableLayout === 'fixed') return;
-                table.querySelectorAll('th').forEach(th => {
-                    const cw = window.getComputedStyle(th).width;
-                    th.style.width = cw;
-                    th.style.minWidth = cw;
-                });
-                table.style.tableLayout = 'fixed';
-            };
-
             cols.forEach(col => {
                 // Ajouter le resizer s'il n'existe pas déjà
                 if (col.querySelector('.resizer')) return;
@@ -4791,7 +4774,6 @@ function populateDatalist(datalistId, options) {
                 const mouseDownHandler = function(e) {
                     // Empêcher la propagation pour ne pas interférer avec d'autres clics
                     e.preventDefault();
-                    freezeTableLayout();
                     x = e.clientX;
                     const styles = window.getComputedStyle(col);
                     w = parseInt(styles.width, 10);
@@ -4821,7 +4803,6 @@ function populateDatalist(datalistId, options) {
                 /* ── Support tactile (Android / iOS) ── */
                 const touchStartHandler = function(e) {
                     e.preventDefault();
-                    freezeTableLayout();
                     const touch = e.touches[0];
                     x = touch.clientX;
                     const styles = window.getComputedStyle(col);

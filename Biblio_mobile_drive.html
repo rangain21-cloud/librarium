@@ -5345,6 +5345,7 @@ async function loadAllFromDrive() {
                 complete: (results) => {
                     appState.authorsData = results.data;
                     appState.authorsFilename = 'Auteurs.csv';
+                    if (typeof updateAuthorDatalists === 'function') updateAuthorDatalists();
                     if (typeof updateButtonStates === 'function') updateButtonStates();
                     console.log('✓ Auteurs chargés:', results.data.length, 'lignes');
                 }

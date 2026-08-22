@@ -3273,19 +3273,58 @@ function driveImgPickRefresh() {
         html += `<button class="btn btn-muted btn-sm btn-full" style="justify-content:flex-start;text-align:left;margin-bottom:4px" onclick="driveImgPickEnterFolder(${i})">📁 ${escHtml(f.name)}</button>`;
     });
     _driveImgPickVisible.forEach((e, i) => {
-        // Vignette d'aperçu (thumbnailLink fourni par Drive) avant le nom du fichier ;
-        // repli sur l'icône générique si aucune vignette n'est disponible ou si son
-        // chargement échoue (fichier tout juste ajouté, vignette pas encore générée…).
-        const thumb = e.thumbnailLink
-            ? `<img src="${escHtml(e.thumbnailLink)}" loading="lazy" class="drive-img-thumb" alt=""
-                    onerror="this.outerHTML='<span class=&quot;drive-img-thumb-fallback&quot;>🖼</span>'">`
-            : `<span class="drive-img-thumb-fallback">🖼</span>`;
+        // Emplacement de la vignette : on démarre toujours sur l'icône de repli,
+        // puis on la remplace une fois la vignette réellement téléchargée (voir
+        // driveImgPickLoadVisibleThumbs) — un simple <img src="thumbnailLink">
+        // ne fonctionne pas de façon fiable (Safari notamment bloque les cookies
+        // tiers dont Drive a besoin pour servir l'image sans jeton explicite).
+        const thumb = `<span class="drive-img-thumb-fallback" data-thumb-slot="${i}">🖼</span>`;
         html += `<button class="btn btn-muted btn-sm btn-full" style="justify-content:flex-start;text-align:left;margin-bottom:4px;white-space:normal" onclick="chooseDriveImg(${i})">${thumb} ${escHtml(e.name)}</button>`;
     });
     if (!_driveImgPickVisibleFolders.length && !_driveImgPickVisible.length) {
         html += '<p class="anim-hint">Aucune image ni sous-dossier ici.</p>';
     }
     document.getElementById('driveImgPickList').innerHTML = html;
+    driveImgPickLoadVisibleThumbs();
+}
+
+// Télécharge les vignettes des images actuellement affichées, de façon
+// AUTHENTIFIÉE (jeton Bearer déjà utilisé pour le reste de Drive), et remplace
+// l'icône de repli par l'aperçu une fois chaque téléchargement terminé. Un
+// simple <img src="thumbnailLink"> échoue souvent silencieusement (403), car
+// Drive attend soit une authentification explicite, soit un cookie de session
+// Google que certains navigateurs (Safari en tête, avec son blocage des
+// cookies tiers) ne transmettent pas dans ce contexte.
+let _driveImgPickRenderGen = 0;      // jeton de génération : ignore les réponses obsolètes si on a changé de dossier/tri entre-temps
+const _driveImgThumbCache  = new Map(); // fileId -> blob URL, réutilisé tant que la modale reste ouverte
+
+async function driveImgPickLoadVisibleThumbs() {
+    const gen = ++_driveImgPickRenderGen;
+    const entries = _driveImgPickVisible;
+    const CONCURRENCY = 4; // modéré, pour ne pas saturer le réseau si le dossier est très fourni
+    let idx = 0;
+
+    async function worker() {
+        while (idx < entries.length) {
+            const i = idx++;
+            const e = entries[i];
+            if (!e.thumbnailLink) continue;
+            try {
+                let url = _driveImgThumbCache.get(e.id);
+                if (!url) {
+                    const r = await fetch(e.thumbnailLink, { headers: { Authorization: 'Bearer ' + driveToken } });
+                    if (!r.ok) continue; // pas de vignette accessible : on garde l'icône de repli
+                    const blob = await r.blob();
+                    url = URL.createObjectURL(blob);
+                    _driveImgThumbCache.set(e.id, url);
+                }
+                if (gen !== _driveImgPickRenderGen) continue; // la vue a changé pendant le téléchargement : on n'applique plus
+                const slot = document.querySelector(`[data-thumb-slot="${i}"]`);
+                if (slot) slot.outerHTML = `<img class="drive-img-thumb" src="${escHtml(url)}" alt="">`;
+            } catch (err) { /* silencieux : l'icône de repli reste affichée */ }
+        }
+    }
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, entries.length) }, worker));
 }
 
 function driveImgPickEnterFolder(i) {
@@ -3307,6 +3346,8 @@ function chooseDriveImg(i) {
 function closeDriveImgPickModal() {
     document.getElementById('driveImgPickModal').classList.remove('open');
     _driveImgPickCallback = null;
+    _driveImgThumbCache.forEach(url => URL.revokeObjectURL(url));
+    _driveImgThumbCache.clear();
 }
 
 async function loadImagesFromDrive() {
